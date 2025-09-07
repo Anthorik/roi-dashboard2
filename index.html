@@ -387,7 +387,7 @@
       const v = vehicleById(l.vehiculeId);
       const wearRate = (globals.wearPerKm||0);
       const wear = (v?.costs?.useWear ? ((l.kms||0) * wearRate) : 0);
-      return after - wear - (l.extras||0) - (l.extraKmFee||0) + (l.fuelAdj||0);
+      return after - wear - (l.extras||0) + (l.extraKmFee||0) + (l.fuelAdj||0);
     }
 
     // Table Locations + filtres
