@@ -80,6 +80,7 @@
     <div><label>Frais km supp (€)</label><input type="number" id="extraKmFee" min="0" step="0.01" value="0"/></div>
         <div><label>Frais divers (€)</label><input type="number" id="extras" min="0" step="0.1" value="0"/></div>
         <div><label>Ajustement carburant (+/− €)</label><input type="number" id="fuelAdj" step="0.1" value="0"/></div>
+        <div><label>Plateforme</label><select id="platform"><option value="getaround">Getaround</option><option value="turo">Turo</option></select></div>
         <div class="md:col-span-2"><label>Notes</label><input type="text" id="notes" placeholder="Ex. week-end, pro, remise…"/></div>
       </div>
       <div class="mt-3 flex flex-wrap gap-2">
@@ -91,7 +92,7 @@
       </div>
       <div class="mt-4 overflow-x-auto">
         <table>
-          <thead><tr><th>Date</th><th>Jours</th><th>€/j</th><th>Km</th><th>Frais</th><th>Km supp (€)</th><th>Carburant ±</th><th>Véhicule</th><th>Net loc</th><th>Notes</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Date</th><th>Jours</th><th>€/j</th><th>Km</th><th>Frais</th><th>Km supp (€)</th><th>Carburant ±</th><th>Véhicule</th><th>Plateforme</th><th>Net loc</th><th>Notes</th><th>Actions</th></tr></thead>
           <tbody id="locTable"></tbody>
         </table>
       </div>
@@ -416,7 +417,7 @@
           <td>${l.kms||'-'}</td>
           <td>${(l.extras||0).toFixed(2)}</td>
           <td>${(l.extraKmFee||0).toFixed(2)}</td><td>${(l.fuelAdj||0).toFixed(2)}</td>
-          <td>${v? v.name : '—'}</td>
+          <td>${v? v.name : '—'}</td><td>${l.platform || '—'}</td>
           <td><span class="pill" style="background:${net>=0?'rgba(22,163,74,.18)':'rgba(239,68,68,.18)'};color:${net>=0?'#16a34a':'#ef4444'}">${net.toFixed(2)}€</span></td>
           <td title="${(l.notes||'').replace(/"/g,'&quot;')}" style="max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${l.notes||''}</td>
           <td class="whitespace-nowrap">
