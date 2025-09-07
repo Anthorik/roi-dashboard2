@@ -22,23 +22,24 @@
     <h1 class="text-2xl font-bold mb-4">📊 Dashboard ROI – Flotte Auto</h1>
     <div class="card">
       <h2 class="text-xl mb-3">📅 Locations réelles</h2>
-      
-<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-  <div><label>Date</label><input type="date" id="date"/></div>
-  <div><label>Jours</label><input type="number" id="jours" value="1"/></div>
-  <div><label>Net touché (€)</label><input type="number" id="net" value="0"/></div>
-  <div><label>Véhicule</label><input id="vehicule" value="Clio"/></div>
-  <div><label>Plateforme</label>
-    <select id="plateforme">
-      <option value="getaround">Getaround</option>
-      <option value="turo">Turo</option>
-    </select>
-  </div>
-  <div class="md:col-span-2"><label>Notes</label><input type="text" id="notes"/></div>
-</div>
-<button class="btn" onclick="saveLocation()">Enregistrer</button>
-<button id="cancelEditBtn" class="btn ml-2 hidden" onclick="cancelEdit()">Annuler</button>
-
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div><label>Date</label><input type="date" id="date"/></div>
+        <div><label>Jours</label><input type="number" id="jours" value="1"/></div>
+        <div><label>€/jour</label><input type="number" id="prixJour" value="30"/></div>
+        <div><label>Véhicule</label><input id="vehicule" value="Clio"/></div>
+        <div><label>Km totaux</label><input type="number" id="kms"/></div>
+        <div><label>Frais km supp (€)</label><input type="number" id="kmSupp" value="0"/></div>
+        <div><label>Frais divers (€)</label><input type="number" id="extras" value="0"/></div>
+        <div><label>Carburant ± (€)</label><input type="number" id="fuelAdj" value="0"/></div>
+        <div><label>Plateforme</label>
+          <select id="plateforme">
+            <option value="getaround">Getaround</option>
+            <option value="turo">Turo</option>
+          </select>
+        </div>
+        <div class="md:col-span-2"><label>Notes</label><input type="text" id="notes"/></div>
+      </div>
+      <button class="btn" onclick="addLocation()">Enregistrer</button>
     </div>
 
     <div class="card">
@@ -51,82 +52,55 @@
     </div>
   </div>
 
-  
-<script>
-  const locations = [];
-  let editIndex = null;
-
-  function euro(n) { return Number(n).toFixed(2) + "€"; }
-
-  function saveLocation() {
-    const loc = {
-      date: document.getElementById('date').value,
-      jours: Number(document.getElementById('jours').value),
-      net: Number(document.getElementById('net').value),
-      vehicule: document.getElementById('vehicule').value,
-      plateforme: document.getElementById('plateforme').value,
-      notes: document.getElementById('notes').value,
+  <script>
+    const commissionRate = {
+      getaround: 0.10,
+      turo: 0.244, // Exemple de Turo : 37,10 + 7,42 = ~24,4 %
     };
+    const locations = [];
 
-    if (editIndex !== null) {
-      locations[editIndex] = loc;
-      editIndex = null;
-      document.getElementById('cancelEditBtn').classList.add('hidden');
-    } else {
-      locations.push(loc);
+    function euro(n) { return Number(n).toFixed(2) + "€"; }
+
+    function calcNet(loc) {
+      const brut = loc.prixJour * loc.jours;
+      const commission = brut * (commissionRate[loc.plateforme] || 0);
+      const net = brut - commission + Number(loc.kmSupp) - Number(loc.extras) + Number(loc.fuelAdj);
+      return net;
     }
 
-    clearForm();
-    renderTable();
-  }
+    function addLocation() {
+      const loc = {
+        date: document.getElementById('date').value,
+        jours: Number(document.getElementById('jours').value),
+        prixJour: Number(document.getElementById('prixJour').value),
+        kms: Number(document.getElementById('kms').value),
+        kmSupp: Number(document.getElementById('kmSupp').value),
+        extras: Number(document.getElementById('extras').value),
+        fuelAdj: Number(document.getElementById('fuelAdj').value),
+        plateforme: document.getElementById('plateforme').value,
+        vehicule: document.getElementById('vehicule').value,
+        notes: document.getElementById('notes').value,
+      };
+      locations.push(loc);
+      renderTable();
+    }
 
-  function clearForm() {
-    document.getElementById('date').value = "";
-    document.getElementById('jours').value = 1;
-    document.getElementById('net').value = 0;
-    document.getElementById('vehicule').value = "Clio";
-    document.getElementById('plateforme').value = "getaround";
-    document.getElementById('notes').value = "";
-    document.getElementById('cancelEditBtn').classList.add('hidden');
-  }
-
-  function cancelEdit() {
-    editIndex = null;
-    clearForm();
-  }
-
-  function editLoc(index) {
-    const loc = locations[index];
-    document.getElementById('date').value = loc.date;
-    document.getElementById('jours').value = loc.jours;
-    document.getElementById('net').value = loc.net;
-    document.getElementById('vehicule').value = loc.vehicule;
-    document.getElementById('plateforme').value = loc.plateforme;
-    document.getElementById('notes').value = loc.notes;
-    editIndex = index;
-    document.getElementById('cancelEditBtn').classList.remove('hidden');
-  }
-
-  function renderTable() {
-    const tbody = document.getElementById('locTable');
-    tbody.innerHTML = "";
-    locations.forEach((loc, i) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${loc.date}</td>
-        <td>${loc.jours}</td>
-        <td><span class="pill" style="background:#166534">${euro(loc.net)}</span></td>
-        <td>${loc.vehicule}</td>
-        <td>${loc.plateforme}</td>
-        <td>${loc.notes}</td>
-        <td>
-          <button onclick="editLoc(${i})">✏️</button>
-          <button onclick="locations.splice(${i},1); renderTable()">🗑️</button>
-        </td>`;
-      tbody.appendChild(tr);
-    });
-  }
-</script>
-
+    function renderTable() {
+      const tbody = document.getElementById('locTable');
+      tbody.innerHTML = "";
+      for (const loc of locations) {
+        const net = calcNet(loc);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${loc.date}</td><td>${loc.jours}</td><td>${euro(loc.prixJour)}</td>
+          <td>${euro(loc.kmSupp)}</td><td>${euro(loc.extras)}</td><td>${euro(loc.fuelAdj)}</td>
+          <td>${loc.plateforme}</td>
+          <td><span class="pill" style="background:${net>=0?'#166534':'#7f1d1d'};">${euro(net)}</span></td>
+          <td><button onclick="this.parentNode.parentNode.remove()">❌</button></td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+  </script>
 </body>
 </html>
