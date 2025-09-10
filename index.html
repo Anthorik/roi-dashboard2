@@ -1,13 +1,12 @@
 <!DOCTYPE html>
-
 <html lang="fr">
 <head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Dashboard ROI - Flotte Auto</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<style>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard ROI - Flotte Auto</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
     :root {
       --bg1:#0b0d10; --bg2:#111418; --card:rgba(22,26,32,.72); --text:#e7e9ee; --muted:#a4acb9;
       --border:rgba(255,255,255,.08); --ring:#7dd3fc;
@@ -49,124 +48,126 @@
   </style>
 </head>
 <body>
-<header class="mb-6 max-w-7xl mx-auto px-4">
-<div class="flex items-center justify-between gap-4">
-<h1 class="text-2xl font-extrabold">📊 Dashboard ROI – Flotte Auto</h1>
-<div class="flex flex-wrap items-center gap-2">
-<label class="toggle" title="Basculer thème clair/sombre"><span class="hint">Thème clair</span><input id="themeToggle" type="checkbox"/></label>
-<button class="btn-ghost" id="exportJson">Export JSON</button>
-<label class="btn-ghost cursor-pointer">Import JSON<input accept="application/json" class="hidden" id="importJson" type="file"/></label>
-<button class="btn-ghost" id="exportCsv">Export CSV</button>
-</div>
-</div>
-<div class="mt-4 flex flex-wrap gap-2">
-<button class="btn" onclick="showTab('locations')">Locations réelles</button>
-<button class="btn" onclick="showTab('vehicles')">Véhicules</button>
-<button class="btn" onclick="showTab('params')">Paramètres globaux</button>
-<button class="btn" onclick="showTab('previsions')">Prévisions &amp; Tarifs</button>
-<button class="btn" onclick="showTab('suivi')">Suivi mensuel</button>
-</div>
-</header>
-<main class="max-w-7xl mx-auto px-4 space-y-6">
-<!-- LOCATIONS -->
-<section class="card hidden" id="locations">
-<h2 class="text-xl font-semibold mb-3">📅 Locations réelles</h2>
-<div class="grid-4">
-<div><label>Début</label><input id="date" type="date"/></div>
-<div><label>Jours</label><input id="jours" min="1" type="number" value="1"/></div>
-<div><label>Net touché (€)</label><input id="netTouché" step="0.01" type="number" value="0"/></div>
-<div><label>Véhicule</label><select id="vehicule"></select></div>
-<div><label>Plateforme</label>
-<select id="plateforme">
-<option value="Getaround">Getaround</option>
-<option value="Turo">Turo</option>
-<option value="Autre">Autre</option>
-</select>
-</div>
-<div class="md:col-span-2"><label>Notes</label><input id="notes" placeholder="Ex. week-end, pro, remise…" type="text"/></div>
-</div>
-<div class="mt-3 flex flex-wrap gap-2">
-<button class="btn" id="saveBtn" onclick="saveLocation()">Enregistrer</button>
-<button class="btn-ghost hidden" id="cancelEditBtn" onclick="cancelEdit()">Annuler</button>
-<select class="w-auto" id="filterVehicule"></select>
-<input class="w-auto" id="filterMonth" type="month"/>
-<button class="btn-ghost" onclick="clearFilters()">Effacer filtres</button>
-</div>
-<div class="mt-4 overflow-x-auto">
-<table>
-<thead><tr><th>Date</th><th>Jours</th><th>Net</th><th>Plateforme</th><th>Véhicule</th><th>Notes</th><th>Actions</th></tr></thead>
-<tbody id="locTable"></tbody>
-</table>
-</div>
-<p class="text-sm mt-2 hint">Net = montant que tu touches réellement. Tu peux indiquer directement ce chiffre ici.</p>
-</section>
-<!-- VEHICLES -->
-<section class="card hidden" id="vehicles">
-<h2 class="text-xl font-semibold mb-3">🚗 Véhicules</h2>
-<div class="mb-3 flex flex-wrap gap-2">
-<button class="btn" onclick="addVehicle()">+ Ajouter un véhicule</button>
-</div>
-<div class="grid-2" id="vehiclesList"></div>
-</section>
-<!-- PARAMS GLOBAUX -->
-<section class="card hidden" id="params">
-<h2 class="text-xl font-semibold mb-3">⚙️ Paramètres globaux</h2>
-<div class="grid-3">
-<div><label>Commission plateforme (%)</label><input id="commission" min="0" step="0.1" type="number" value="10"/></div>
-<div><label>Usure €/km (taux global)</label><input id="wearPerKm" min="0" step="0.01" type="number" value="0.12"/></div>
-<div><label>Km inclus / jour (info)</label><input id="kmInclus" min="0" step="1" type="number" value="100"/></div>
-</div>
-<p class="mt-2 hint">L’usure/km utilise le taux ci-dessus, mais son application se règle <b>par véhicule</b> (switch “Usure/km activée” dans l’onglet Véhicules).</p>
-<div class="mt-4"><button class="btn" onclick="saveGlobals()">💾 Sauvegarder</button><span class="ml-3 text-sm" id="savedTag" style="color:var(--muted); display:none;">✔️ Sauvegardé</span></div>
-</section>
-<!-- PREVISIONS -->
-<section class="card hidden" id="previsions">
-<h2 class="text-xl font-semibold mb-3">📈 Prévisions &amp; Tarifs</h2>
-<div class="grid-4">
-<div><label>Véhicule</label><select id="simVehicule"></select></div>
-<div><label>Jours loués / mois</label><input id="simDays" min="0" type="number" value="12"/></div>
-<div><label>Prix proprio €/j</label><input id="simPrice" min="0" step="0.1" type="number" value="30"/></div>
-<div><label>Km/j (moy.)</label><input id="simKmDay" min="0" type="number" value="100"/></div>
-</div>
-<div class="grid-3 mt-3">
-<div><label>Commission (%)</label><input id="simCommission" step="0.1" type="number"/></div>
-<div><label>Usure €/km</label><input id="simWear" step="0.01" type="number"/></div>
-<div><label>Saisonnalité de base (%)</label><input id="simSeasonBase" type="number" value="100"/></div>
-</div>
-<div class="mt-4"><button class="btn" onclick="runSim()">Calculer</button></div>
-<div class="mt-4 grid-3" id="simSummary"></div>
-<div class="mt-6">
-<h3 class="font-semibold mb-2">Prévision mensuelle (12 mois)</h3>
-<canvas height="160" id="simChart"></canvas>
-<div class="mt-3 overflow-x-auto">
-<table>
-<thead><tr><th>Mois</th><th>CA brut</th><th>Après com</th><th>Usure</th><th>Frais fixes</th><th>Net</th></tr></thead>
-<tbody id="simTable"></tbody>
-</table>
-</div>
-</div>
-<div class="mt-6">
-<h3 class="font-semibold mb-2">Sensibilité rapide</h3>
-<div class="grid-3" id="simWhatIf"></div>
-</div>
-</section>
-<!-- SUIVI -->
-<section class="card hidden" id="suivi">
-<h2 class="text-xl font-semibold mb-1">📊 Suivi mensuel</h2>
-<p class="hint mb-3">Astuce : choisis un véhicule pour voir <b>uniquement</b> ses résultats. “Tous véhicules” additionne tout et affiche aussi le détail par véhicule. Les locations sont ventilées <b>jour par jour</b> sur chaque mois.</p>
-<div class="flex flex-wrap items-center gap-2 mb-3">
-<select class="w-auto" id="suiviVehicule"></select>
-<input class="w-auto" id="suiviMonth" type="month"/>
-</div>
-<div class="grid-2">
-<div><canvas height="150" id="chartNet"></canvas></div>
-<div><canvas height="150" id="chartCumul"></canvas></div>
-</div>
-<div class="mt-3 text-sm" id="monthTop"></div>
-<div class="mt-2 grid-2" id="monthBreakdown"></div>
-</section>
-</main>
-<script>
+  <header class="mb-6 max-w-7xl mx-auto px-4">
+    <div class="flex items-center justify-between gap-4">
+      <h1 class="text-2xl font-extrabold">📊 Dashboard ROI – Flotte Auto</h1>
+      <div class="flex flex-wrap items-center gap-2">
+        <label class="toggle" title="Basculer thème clair/sombre"><span class="hint">Thème clair</span><input type="checkbox" id="themeToggle"/></label>
+        <button id="exportJson" class="btn-ghost">Export JSON</button>
+        <label class="btn-ghost cursor-pointer">Import JSON<input id="importJson" type="file" accept="application/json" class="hidden"/></label>
+        <button id="exportCsv" class="btn-ghost">Export CSV</button>
+      </div>
+    </div>
+    <div class="mt-4 flex flex-wrap gap-2">
+      <button class="btn" onclick="showTab('locations')">Locations réelles</button>
+      <button class="btn" onclick="showTab('vehicles')">Véhicules</button>
+      <button class="btn" onclick="showTab('params')">Paramètres globaux</button>
+      <button class="btn" onclick="showTab('previsions')">Prévisions & Tarifs</button>
+      <button class="btn" onclick="showTab('suivi')">Suivi mensuel</button>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 space-y-6">
+    <!-- LOCATIONS -->
+    <section id="locations" class="card hidden">
+      <h2 class="text-xl font-semibold mb-3">📅 Locations réelles</h2>
+      <div class="grid-4">
+        <div><label>Début</label><input type="date" id="date"/></div>
+        <div><label>Jours</label><input type="number" id="jours" min="1" value="1"/></div>
+        <div><label>Prix proprio €/jour</label><input type="number" id="prixJour" min="0" step="0.1" value="30"/></div>
+        <div><label>Véhicule</label><select id="vehicule"></select></div>
+        <div><label>Km totaux (optionnel)</label><input type="number" id="kms" min="0" step="1" placeholder="ex. 250"/></div>
+        <div><label>Frais divers (€)</label><input type="number" id="extras" min="0" step="0.1" value="0"/></div>
+        <div><label>Ajustement carburant (+/− €)</label><input type="number" id="fuelAdj" step="0.1" value="0"/></div>
+        <div class="md:col-span-2"><label>Notes</label><input type="text" id="notes" placeholder="Ex. week-end, pro, remise…"/></div>
+      </div>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button id="saveBtn" class="btn" onclick="saveLocation()">Enregistrer</button>
+        <button id="cancelEditBtn" class="btn-ghost hidden" onclick="cancelEdit()">Annuler</button>
+        <select id="filterVehicule" class="w-auto"></select>
+        <input type="month" id="filterMonth" class="w-auto"/>
+        <button class="btn-ghost" onclick="clearFilters()">Effacer filtres</button>
+      </div>
+      <div class="mt-4 overflow-x-auto">
+        <table>
+          <thead><tr><th>Date</th><th>Jours</th><th>€/j</th><th>Km</th><th>Frais</th><th>Carburant ±</th><th>Véhicule</th><th>Net loc</th><th>Notes</th><th>Actions</th></tr></thead>
+          <tbody id="locTable"></tbody>
+        </table>
+      </div>
+      <p class="text-sm mt-2 hint">Net location = (prix × jours × (1–commission)) − (usure si activée) − frais divers + ajustement carburant.</p>
+    </section>
+
+    <!-- VEHICLES -->
+    <section id="vehicles" class="card hidden">
+      <h2 class="text-xl font-semibold mb-3">🚗 Véhicules</h2>
+      <div class="mb-3 flex flex-wrap gap-2">
+        <button class="btn" onclick="addVehicle()">+ Ajouter un véhicule</button>
+      </div>
+      <div id="vehiclesList" class="grid-2"></div>
+    </section>
+
+    <!-- PARAMS GLOBAUX -->
+    <section id="params" class="card hidden">
+      <h2 class="text-xl font-semibold mb-3">⚙️ Paramètres globaux</h2>
+      <div class="grid-3">
+        <div><label>Commission plateforme (%)</label><input type="number" id="commission" min="0" step="0.1" value="10"/></div>
+        <div><label>Usure €/km (taux global)</label><input type="number" id="wearPerKm" min="0" step="0.01" value="0.12"/></div>
+        <div><label>Km inclus / jour (info)</label><input type="number" id="kmInclus" min="0" step="1" value="100"/></div>
+      </div>
+      <p class="mt-2 hint">L’usure/km utilise le taux ci-dessus, mais son application se règle <b>par véhicule</b> (switch “Usure/km activée” dans l’onglet Véhicules).</p>
+      <div class="mt-4"><button class="btn" onclick="saveGlobals()">💾 Sauvegarder</button><span id="savedTag" class="ml-3 text-sm" style="color:var(--muted); display:none;">✔️ Sauvegardé</span></div>
+    </section>
+
+    <!-- PREVISIONS -->
+    <section id="previsions" class="card hidden">
+      <h2 class="text-xl font-semibold mb-3">📈 Prévisions & Tarifs</h2>
+      <div class="grid-4">
+        <div><label>Véhicule</label><select id="simVehicule"></select></div>
+        <div><label>Jours loués / mois</label><input type="number" id="simDays" value="12" min="0"/></div>
+        <div><label>Prix proprio €/j</label><input type="number" id="simPrice" value="30" step="0.1" min="0"/></div>
+        <div><label>Km/j (moy.)</label><input type="number" id="simKmDay" value="100" min="0"/></div>
+      </div>
+      <div class="grid-3 mt-3">
+        <div><label>Commission (%)</label><input type="number" id="simCommission" step="0.1"/></div>
+        <div><label>Usure €/km</label><input type="number" id="simWear" step="0.01"/></div>
+        <div><label>Saisonnalité de base (%)</label><input type="number" id="simSeasonBase" value="100"/></div>
+      </div>
+      <div class="mt-4"><button class="btn" onclick="runSim()">Calculer</button></div>
+      <div id="simSummary" class="mt-4 grid-3"></div>
+      <div class="mt-6">
+        <h3 class="font-semibold mb-2">Prévision mensuelle (12 mois)</h3>
+        <canvas id="simChart" height="160"></canvas>
+        <div class="mt-3 overflow-x-auto">
+          <table>
+            <thead><tr><th>Mois</th><th>CA brut</th><th>Après com</th><th>Usure</th><th>Frais fixes</th><th>Net</th></tr></thead>
+            <tbody id="simTable"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="mt-6">
+        <h3 class="font-semibold mb-2">Sensibilité rapide</h3>
+        <div id="simWhatIf" class="grid-3"></div>
+      </div>
+    </section>
+
+    <!-- SUIVI -->
+    <section id="suivi" class="card hidden">
+      <h2 class="text-xl font-semibold mb-1">📊 Suivi mensuel</h2>
+      <p class="hint mb-3">Astuce : choisis un véhicule pour voir <b>uniquement</b> ses résultats. “Tous véhicules” additionne tout et affiche aussi le détail par véhicule. Les locations sont ventilées <b>jour par jour</b> sur chaque mois.</p>
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <select id="suiviVehicule" class="w-auto"></select>
+        <input type="month" id="suiviMonth" class="w-auto" />
+      </div>
+      <div class="grid-2">
+        <div><canvas id="chartNet" height="150"></canvas></div>
+        <div><canvas id="chartCumul" height="150"></canvas></div>
+      </div>
+      <div id="monthTop" class="mt-3 text-sm"></div>
+      <div id="monthBreakdown" class="mt-2 grid-2"></div>
+    </section>
+  </main>
+
+  <script>
     // ===== Storage & State =====
     const KEY='roi_multi_v7_resid_split_wearperveh_prorata_equilibre';
     const data = JSON.parse(localStorage.getItem(KEY) || '{}');
@@ -358,32 +359,14 @@
     }
 
     // ===== Locations =====
-    
-function saveLocation(){
-  const date = $('date').value; if(!date) return alert('Choisis une date');
-  const obj = {
-    date,
-    jours: Number($('jours').value || 1),
-    net: Number($('netTouché').value || 0),
-    notes: $('notes').value || '',
-    vehiculeId: $('vehicule').value,
-    plateforme: $('plateforme').value
-  };
-  if(editId){
-    locations = locations.map(l => l.id === editId ? {...l, ...obj} : l);
-    editId = null;
-    $('cancelEditBtn').classList.add('hidden');
-    $('saveBtn').textContent = 'Enregistrer';
-  } else {
-    const id = crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
-    locations.push({id, ...obj});
-  }
-  saveAll();
-  clearLocForm();
-  renderTable();
-  renderCharts();
-}
-    ;
+    function saveLocation(){
+      const date=$('date').value; if(!date) return alert('Choisis une date');
+      const obj={ date,
+        jours:Number($('jours').value||1), prixJour:Number($('prixJour').value||0),
+        kms:$('kms').value?Number($('kms').value):0, extras:Number($('extras').value||0),
+        fuelAdj:Number($('fuelAdj').value||0), notes:$('notes').value||'',
+        vehiculeId:$('vehicule').value
+      };
       if(editId){ locations=locations.map(l=> l.id===editId? {...l,...obj}:l); editId=null; $('cancelEditBtn').classList.add('hidden'); $('saveBtn').textContent='Enregistrer'; }
       else { const id=crypto.randomUUID?crypto.randomUUID():String(Date.now()); locations.push({id,...obj}); }
       saveAll(); clearLocForm(); renderTable(); renderCharts();
@@ -391,24 +374,20 @@ function saveLocation(){
     function cancelEdit(){ editId=null; clearLocForm(); $('cancelEditBtn').classList.add('hidden'); $('saveBtn').textContent='Enregistrer'; }
     function clearLocForm(){ $('date').value=''; $('jours').value=1; $('prixJour').value=30; $('kms').value=''; $('extras').value='0'; $('fuelAdj').value='0'; $('notes').value=''; }
     function removeLoc(id){ locations=locations.filter(l=> l.id!==id); saveAll(); renderTable(); renderCharts(); }
-    
-function editLoc(id){
-  const l = locations.find(x => x.id === id); if(!l) return;
-  editId = id;
-  $('date').value = l.date || '';
-  $('jours').value = l.jours ?? 1;
-  $('netTouché').value = l.net ?? 0;
-  $('notes').value = l.notes || '';
-  $('vehicule').value = l.vehiculeId;
-  $('plateforme').value = l.plateforme || 'Getaround';
-  $('cancelEditBtn').classList.remove('hidden');
-  $('saveBtn').textContent = 'Mettre à jour';
-  window.scrollTo({top:0,behavior:'smooth'});
-}
-    );
+    function editLoc(id){
+      const l=locations.find(x=>x.id===id); if(!l) return;
+      editId=id; $('date').value=l.date||''; $('jours').value=l.jours??1; $('prixJour').value=l.prixJour??0; $('kms').value=l.kms??''; $('extras').value=l.extras??0; $('fuelAdj').value=l.fuelAdj??0; $('notes').value=l.notes||'';
+      $('vehicule').value=l.vehiculeId; $('cancelEditBtn').classList.remove('hidden'); $('saveBtn').textContent='Mettre à jour'; window.scrollTo({top:0,behavior:'smooth'});
     }
 
-    function netLocation(l){ return Number(l.net) || 0; }
+    function netLocation(l){
+      const com=(globals.commission||0)/100;
+      const after=(l.prixJour*(l.jours||1))*(1-com);
+      const v = vehicleById(l.vehiculeId);
+      const wearRate = (globals.wearPerKm||0);
+      const wear = (v?.costs?.useWear ? ((l.kms||0) * wearRate) : 0);
+      return after - wear - (l.extras||0) + (l.fuelAdj||0);
+    }
 
     // Table Locations + filtres
     function clearFilters(){ $('filterVehicule').value='ALL'; $('filterMonth').value=''; renderTable(); }
@@ -434,7 +413,7 @@ function editLoc(id){
           <td>${l.kms||'-'}</td>
           <td>${(l.extras||0).toFixed(2)}</td>
           <td>${(l.fuelAdj||0).toFixed(2)}</td>
-          <td>${v? v.name : "—"}</td><td>${l.plateforme || "—"}</td>
+          <td>${v? v.name : '—'}</td>
           <td><span class="pill" style="background:${net>=0?'rgba(22,163,74,.18)':'rgba(239,68,68,.18)'};color:${net>=0?'#16a34a':'#ef4444'}">${net.toFixed(2)}€</span></td>
           <td title="${(l.notes||'').replace(/"/g,'&quot;')}" style="max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${l.notes||''}</td>
           <td class="whitespace-nowrap">
@@ -660,27 +639,5 @@ function editLoc(id){
     }
     init();
   </script>
-<script>
-function renderTable(){
-  const tbody=$('locTable'); tbody.innerHTML='';
-  const m=$('filterMonth').value; const vf=$('filterVehicule').value||'ALL';
-  const arr=locations.slice().sort((a,b)=> new Date(b.date)-new Date(a.date)).filter(l=> (!m||monthKey(l.date)===m) && (vf==='ALL'||l.vehiculeId===vf));
-  for(const l of arr){
-    const v=vehicleById(l.vehiculeId); const net=netLocation(l);
-    const tr=document.createElement('tr');
-    tr.innerHTML=\`
-      <td>\${l.date}</td>
-      <td>\${l.jours||1}</td>
-      <td><span class="pill" style="background:\${net>=0?'rgba(22,163,74,.18)':'rgba(239,68,68,.18)'};color:\${net>=0?'#16a34a':'#ef4444'}">\${net.toFixed(2)}€</span></td>
-      <td>\${l.plateforme || "—"}</td>
-      <td>\${v? v.name : "—"}</td>
-      <td title="\${(l.notes||'').replace(/"/g,'&quot;')}" style="max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">\${l.notes||''}</td>
-      <td class="whitespace-nowrap">
-        <button class="btn-ghost" onclick="editLoc('\${l.id}')">✏️</button>
-        <button class="btn-ghost" onclick="removeLoc('\${l.id}')">🗑️</button>
-      </td>\`;
-    tbody.appendChild(tr);
-  }
-}
-</script></body>
+</body>
 </html>
