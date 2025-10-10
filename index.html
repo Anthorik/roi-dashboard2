@@ -7,27 +7,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    :root {
-      --bg1:#0b0d10; --bg2:#111418; --card:rgba(22,26,32,.72); --text:#e7e9ee; --muted:#a4acb9;
-      --border:rgba(255,255,255,.08); --ring:#7dd3fc;
-      --primary:#4f46e5; --primary-d:#4338ca;
-      --pos:#16a34a; --neg:#ef4444;
-    }
-    .light{
-      --bg1:#f7f8fb; --bg2:#eef1f6; --card:rgba(255,255,255,.9); --text:#0f172a; --muted:#5b6576;
-      --border:rgba(15,15,30,.12); --ring:#0ea5e9;
-      --primary:#2563eb; --primary-d:#1e40af;
-      --pos:#16a34a; --neg:#ef4444;
-    }
-    body{
-      min-height:100vh;
-      background:
-        radial-gradient(1000px 600px at 15% -10%, rgba(79,70,229,.14), transparent 60%),
-        radial-gradient(900px 560px at 100% 10%, rgba(14,165,233,.12), transparent 55%),
-        linear-gradient(180deg,var(--bg1),var(--bg2));
-      color:var(--text);
-      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
-    }
+    :root { --bg1:#0b0d10; --bg2:#111418; --card:rgba(22,26,32,.72); --text:#e7e9ee; --muted:#a4acb9; --border:rgba(255,255,255,.08); --ring:#7dd3fc; --primary:#4f46e5; --primary-d:#4338ca; --pos:#16a34a; --neg:#ef4444; }
+    .light{ --bg1:#f7f8fb; --bg2:#eef1f6; --card:rgba(255,255,255,.9); --text:#0f172a; --muted:#5b6576; --border:rgba(15,15,30,.12); --ring:#0ea5e9; --primary:#2563eb; --primary-d:#1e40af; --pos:#16a34a; --neg:#ef4444; }
+    body{ min-height:100vh; background: radial-gradient(1000px 600px at 15% -10%, rgba(79,70,229,.14), transparent 60%), radial-gradient(900px 560px at 100% 10%, rgba(14,165,233,.12), transparent 55%), linear-gradient(180deg,var(--bg1),var(--bg2)); color:var(--text); -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
     .card{ background:var(--card); border:1px solid var(--border); border-radius:1rem; padding:1.1rem; backdrop-filter: blur(8px); }
     .btn{ background:linear-gradient(180deg,var(--primary),var(--primary-d)); color:#fff; padding:.55rem .95rem; border-radius:.7rem; font-weight:700; }
     .btn-ghost{ background:transparent; border:1px solid var(--border); border-radius:.7rem; padding:.5rem .8rem; color:var(--text); }
@@ -45,6 +27,10 @@
     .toggle input:before{ content:""; position:absolute; top:2px; left:2px; width:1.05rem; height:1.05rem; background:#fff; border-radius:999px; transition:all .18s ease; }
     .toggle input:checked:before{ transform:translateX(1.2rem); }
     .hint{ color:var(--muted); font-size:.85rem; }
+    .row-selected{ outline:2px solid var(--ring); background:rgba(125,211,252,.08); }
+    .compact table th, .compact table td{ padding:.25rem .35rem; }
+    .compact .pill{ font-size:.7rem; padding:.15rem .4rem; }
+    .badge{ padding:.1rem .45rem; border:1px solid var(--border); border-radius:.5rem; }
   </style>
 </head>
 <body>
@@ -55,14 +41,12 @@
         <label class="toggle" title="Basculer thème clair/sombre"><span class="hint">Thème clair</span><input type="checkbox" id="themeToggle"/></label>
         <button id="exportJson" class="btn-ghost">Export JSON</button>
         <label class="btn-ghost cursor-pointer">Import JSON<input id="importJson" type="file" accept="application/json" class="hidden"/></label>
-        <button id="exportCsv" class="btn-ghost">Export CSV</button>
+        <button id="exportCsv" class="btn-ghost" onclick="exportSuiviCsv()">Export CSV (Suivi)</button>
       </div>
     </div>
     <div class="mt-4 flex flex-wrap gap-2">
       <button class="btn" onclick="showTab('locations')">Locations réelles</button>
       <button class="btn" onclick="showTab('vehicles')">Véhicules</button>
-      <button class="btn" onclick="showTab('params')">Paramètres globaux</button>
-      <button class="btn" onclick="showTab('previsions')">Prévisions & Tarifs</button>
       <button class="btn" onclick="showTab('suivi')">Suivi mensuel</button>
     </div>
   </header>
@@ -79,6 +63,7 @@
         <div><label>Km totaux (optionnel)</label><input type="number" id="kms" min="0" step="1" placeholder="ex. 250"/></div>
         <div><label>Frais divers (€)</label><input type="number" id="extras" min="0" step="0.1" value="0"/></div>
         <div><label>Ajustement carburant (+/− €)</label><input type="number" id="fuelAdj" step="0.1" value="0"/></div>
+        <div><label>Net reçu (€) – override</label><input type="number" id="netOverride" step="0.1" placeholder="ex. 82.50"/></div>
         <div class="md:col-span-2"><label>Notes</label><input type="text" id="notes" placeholder="Ex. week-end, pro, remise…"/></div>
       </div>
       <div class="mt-3 flex flex-wrap gap-2">
@@ -86,15 +71,17 @@
         <button id="cancelEditBtn" class="btn-ghost hidden" onclick="cancelEdit()">Annuler</button>
         <select id="filterVehicule" class="w-auto"></select>
         <input type="month" id="filterMonth" class="w-auto"/>
+        <input type="text" id="filterNotes" class="w-auto" placeholder="#tag, notes, texte" style="min-width:180px"/>
+        <label class="toggle" title="Mode compact du tableau"><span class="hint">Compact</span><input type="checkbox" id="compactToggle"/></label>
         <button class="btn-ghost" onclick="clearFilters()">Effacer filtres</button>
       </div>
       <div class="mt-4 overflow-x-auto">
         <table>
-          <thead><tr><th>Date</th><th>Jours</th><th>€/j</th><th>Km</th><th>Frais</th><th>Carburant ±</th><th>Véhicule</th><th>Net loc</th><th>Notes</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Date</th><th>Jours</th><th>€/j</th><th>Km</th><th>Frais</th><th>Carburant</th><th>Véhicule</th><th>Net loc</th><th>Notes</th><th>Actions</th></tr></thead>
           <tbody id="locTable"></tbody>
         </table>
       </div>
-      <p class="text-sm mt-2 hint">Net location = (prix × jours × (1–commission)) − (usure si activée) − frais divers + ajustement carburant.</p>
+      <p class="text-sm mt-2 hint">Le net affiché suit : <i>(prix × jours × (1–commission)) − usure − frais + carburant</i>. <b>Si “Net reçu” est saisi, il remplace ce calcul partout.</b></p>
     </section>
 
     <!-- VEHICLES -->
@@ -106,54 +93,10 @@
       <div id="vehiclesList" class="grid-2"></div>
     </section>
 
-    <!-- PARAMS GLOBAUX -->
-    <section id="params" class="card hidden">
-      <h2 class="text-xl font-semibold mb-3">⚙️ Paramètres globaux</h2>
-      <div class="grid-3">
-        <div><label>Commission plateforme (%)</label><input type="number" id="commission" min="0" step="0.1" value="10"/></div>
-        <div><label>Usure €/km (taux global)</label><input type="number" id="wearPerKm" min="0" step="0.01" value="0.12"/></div>
-        <div><label>Km inclus / jour (info)</label><input type="number" id="kmInclus" min="0" step="1" value="100"/></div>
-      </div>
-      <p class="mt-2 hint">L’usure/km utilise le taux ci-dessus, mais son application se règle <b>par véhicule</b> (switch “Usure/km activée” dans l’onglet Véhicules).</p>
-      <div class="mt-4"><button class="btn" onclick="saveGlobals()">💾 Sauvegarder</button><span id="savedTag" class="ml-3 text-sm" style="color:var(--muted); display:none;">✔️ Sauvegardé</span></div>
-    </section>
-
-    <!-- PREVISIONS -->
-    <section id="previsions" class="card hidden">
-      <h2 class="text-xl font-semibold mb-3">📈 Prévisions & Tarifs</h2>
-      <div class="grid-4">
-        <div><label>Véhicule</label><select id="simVehicule"></select></div>
-        <div><label>Jours loués / mois</label><input type="number" id="simDays" value="12" min="0"/></div>
-        <div><label>Prix proprio €/j</label><input type="number" id="simPrice" value="30" step="0.1" min="0"/></div>
-        <div><label>Km/j (moy.)</label><input type="number" id="simKmDay" value="100" min="0"/></div>
-      </div>
-      <div class="grid-3 mt-3">
-        <div><label>Commission (%)</label><input type="number" id="simCommission" step="0.1"/></div>
-        <div><label>Usure €/km</label><input type="number" id="simWear" step="0.01"/></div>
-        <div><label>Saisonnalité de base (%)</label><input type="number" id="simSeasonBase" value="100"/></div>
-      </div>
-      <div class="mt-4"><button class="btn" onclick="runSim()">Calculer</button></div>
-      <div id="simSummary" class="mt-4 grid-3"></div>
-      <div class="mt-6">
-        <h3 class="font-semibold mb-2">Prévision mensuelle (12 mois)</h3>
-        <canvas id="simChart" height="160"></canvas>
-        <div class="mt-3 overflow-x-auto">
-          <table>
-            <thead><tr><th>Mois</th><th>CA brut</th><th>Après com</th><th>Usure</th><th>Frais fixes</th><th>Net</th></tr></thead>
-            <tbody id="simTable"></tbody>
-          </table>
-        </div>
-      </div>
-      <div class="mt-6">
-        <h3 class="font-semibold mb-2">Sensibilité rapide</h3>
-        <div id="simWhatIf" class="grid-3"></div>
-      </div>
-    </section>
-
     <!-- SUIVI -->
     <section id="suivi" class="card hidden">
       <h2 class="text-xl font-semibold mb-1">📊 Suivi mensuel</h2>
-      <p class="hint mb-3">Astuce : choisis un véhicule pour voir <b>uniquement</b> ses résultats. “Tous véhicules” additionne tout et affiche aussi le détail par véhicule. Les locations sont ventilées <b>jour par jour</b> sur chaque mois.</p>
+      <p class="hint mb-3">Astuce : choisis un véhicule pour voir <b>uniquement</b> ses résultats. “Tous véhicules” additionne tout (net ventilé <b>jour par jour</b>). Badge d’occupation = jours loués / capacité.</p>
       <div class="flex flex-wrap items-center gap-2 mb-3">
         <select id="suiviVehicule" class="w-auto"></select>
         <input type="month" id="suiviMonth" class="w-auto" />
@@ -164,75 +107,78 @@
       </div>
       <div id="monthTop" class="mt-3 text-sm"></div>
       <div id="monthBreakdown" class="mt-2 grid-2"></div>
+
+      <!-- Vue tableau (€/%) + VNC -->
+      <div class="mt-4 overflow-x-auto">
+        <table id="suiviTable" class="w-full">
+          <thead>
+            <tr>
+              <th>Mois</th>
+              <th>Net avant fixes (€)</th>
+              <th>Fixes (€)</th>
+              <th>Résultat net (€)</th>
+              <th>Marge (%)</th>
+              <th>VNC à fin de mois (€)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="hint mt-2">VNC = max(Résiduelle, Total investi − Amort. cumulé). Amort. cumulé = Amort./mois × mois écoulés depuis le <b>Début amort.</b></p>
     </section>
   </main>
 
   <script>
     // ===== Storage & State =====
-    const KEY='roi_multi_v7_resid_split_wearperveh_prorata_equilibre';
+    const KEY='roi_multi_v8_vnc_tableau_%_euro';
     const data = JSON.parse(localStorage.getItem(KEY) || '{}');
     const theme = data.theme || 'dark';
 
-    // Vehicles with residual value & per-vehicle wear switch
-    let vehicles = data.vehicles || [
-      { id:'clio',  name:'Clio',  active:true, costs:{ass:56, conn:25, ent:45, totalInvested:11659, residual:0, amortMonths:60, useWear:false} },
-      { id:'tesla', name:'Tesla', active:true, costs:{ass:115, conn:0,  ent:30, totalInvested:0,     residual:0, amortMonths:60, useWear:false} }
-    ];
-    // Migrations
-    vehicles = vehicles.map(v=>{
-      const c=v.costs||{};
-      if(c.totalInvested===undefined){
-        const total = (c.acqTotal||0) + (c.amort? (c.amort*(c.acqMonths||60)) : 0);
-        v.costs = { ass:c.ass||0, conn:c.conn||0, ent:c.ent||0, totalInvested: total||0, residual:0, amortMonths: c.acqMonths||60, useWear:false };
-      }
-      if(c.residual===undefined) v.costs.residual=0;
-      if(c.useWear===undefined)  v.costs.useWear=false;
-      return v;
-    });
+    const UIKEY='roi_ui';
+    const ui = JSON.parse(localStorage.getItem(UIKEY) || '{"compact":false,"selectedId":null}');
+
+    let vehicles = (data.vehicles || [
+      { id:'clio',  name:'Clio',  active:true, costs:{ass:56, conn:25, ent:45, totalInvested:11659, residual:0, amortMonths:60, amortStart:null, useWear:false} },
+      { id:'tesla', name:'Tesla', active:true, costs:{ass:115, conn:0,  ent:30, totalInvested:0,     residual:0, amortMonths:60, amortStart:null, useWear:false} }
+    ]).map(v=>{ v.costs = {ass:0,conn:0,ent:0,totalInvested:0,residual:0,amortMonths:60,amortStart:null,useWear:false, ...(v.costs||{})}; return v; });
 
     let globals = data.globals || { commission:10, wearPerKm:0.12, kmInclus:100 };
-    // Locations: {id, date, jours, prixJour, kms, extras, fuelAdj, notes, vehiculeId}
-    let locations = data.locations || [];
+    // Locations: {id, date, jours, prixJour, kms, extras, fuelAdj, notes, vehiculeId, netOverride}
+    let locations = (data.locations || []).map(l=> ({...l, netOverride: (l.netOverride!==undefined ? l.netOverride : (l.net_recu!==undefined ? l.net_recu : null))}));
     let editId = null;
 
     // ===== Theme =====
     const themeToggle = document.getElementById('themeToggle');
-    function applyTheme(){ themeToggle.checked ? document.documentElement.classList.add('light') : document.documentElement.classList.remove('light'); }
+    function applyTheme(){
+      themeToggle.checked ? document.documentElement.classList.add('light') : document.documentElement.classList.remove('light');
+      document.body.classList.toggle('compact', !!ui.compact);
+    }
     themeToggle.checked=(theme==='light'); applyTheme();
     themeToggle.addEventListener('change', ()=>{ data.theme=themeToggle.checked?'light':'dark'; saveAll(); applyTheme(); });
 
-    function saveAll(){ localStorage.setItem(KEY, JSON.stringify({theme: themeToggle.checked?'light':'dark', vehicles, globals, locations})); }
+    function saveAll(){
+      localStorage.setItem(KEY, JSON.stringify({theme: themeToggle.checked?'light':'dark', vehicles, globals, locations}));
+      localStorage.setItem(UIKEY, JSON.stringify(ui));
+    }
     const $=id=>document.getElementById(id);
     const euro=n=>`${(n||0).toFixed(2)}€`;
     const monthKey=d=> d?.slice(0,7);
 
-    // ===== Date helpers (prorata multi-mois) =====
-    function parseDateISO(dateStr){
-      const [y,m,d]=dateStr.split('-').map(Number);
-      return new Date(Date.UTC(y, m-1, d));
-    }
-    function addDaysUTC(dateObj, n){
-      const d=new Date(dateObj.getTime());
-      d.setUTCDate(d.getUTCDate()+n);
-      return d;
-    }
-    function monthKeyFromDate(dateObj){
-      const y=dateObj.getUTCFullYear();
-      const m=String(dateObj.getUTCMonth()+1).padStart(2,'0');
-      return `${y}-${m}`;
-    }
-    // Ventile le net d'une location jour par jour sur chaque mois concerné
+    // ===== Date helpers =====
+    function parseDateISO(dateStr){ const [y,m,d]=dateStr.split('-').map(Number); return new Date(Date.UTC(y, m-1, d)); }
+    function addDaysUTC(dateObj, n){ const d=new Date(dateObj.getTime()); d.setUTCDate(d.getUTCDate()+n); return d; }
+    function monthKeyFromDate(dateObj){ const y=dateObj.getUTCFullYear(); const m=String(dateObj.getUTCMonth()+1).padStart(2,'0'); return `${y}-${m}`; }
     function splitLocationNetByMonth(l){
       const days=Math.max(1, Number(l.jours||1));
       const start=parseDateISO(l.date);
-      const totalNet=netLocation(l);
-      const perDay=totalNet/days;
-      const map={};
-      for(let i=0;i<days;i++){
-        const d=addDaysUTC(start, i);
-        const mk=monthKeyFromDate(d);
-        map[mk]=(map[mk]||0)+perDay;
-      }
+      const totalNet=netLocation(l); const perDay=totalNet/days; const map={};
+      for(let i=0;i<days;i++){ const d=addDaysUTC(start, i); const mk=monthKeyFromDate(d); map[mk]=(map[mk]||0)+perDay; }
+      return map;
+    }
+    function splitLocationDaysByMonth(l){
+      const days=Math.max(1, Number(l.jours||1));
+      const start=parseDateISO(l.date); const map={};
+      for(let i=0;i<days;i++){ const d=addDaysUTC(start, i); const mk=monthKeyFromDate(d); map[mk]=(map[mk]||0)+1; }
       return map;
     }
 
@@ -244,38 +190,51 @@
       if(base<0) base=0;
       return base/months;
     }
-    function fixedCostsMonthly(v){
-      const c=v.costs||{};
-      return (c.ass||0)+(c.conn||0)+(c.ent||0)+monthlyAmort(v);
-    }
-    function fixedCostsBreakdown(v){
-      const c=v.costs||{};
-      return {
-        ass:c.ass||0, conn:c.conn||0, ent:c.ent||0,
-        amort: monthlyAmort(v),
-        base: Math.max(0,(c.totalInvested||0)-(c.residual||0)),
-        months: Math.max(1, Number(c.amortMonths||0))
-      };
-    }
+    function fixedCostsMonthly(v){ const c=v.costs||{}; return (c.ass||0)+(c.conn||0)+(c.ent||0)+monthlyAmort(v); }
+    function fixedCostsBreakdown(v){ const c=v.costs||{}; return { ass:c.ass||0, conn:c.conn||0, ent:c.ent||0, amort: monthlyAmort(v), base: Math.max(0,(c.totalInvested||0)-(c.residual||0)), months: Math.max(1, Number(c.amortMonths||0)) }; }
     function vehicleById(id){ return vehicles.find(v=> v.id===id); }
+
+    // ===== Amort start / months elapsed / VNC =====
+    function monthsBetween(startYYYYMM, endYYYYMM){
+      if(!startYYYYMM || !/^\d{4}-\d{2}$/.test(startYYYYMM) || !/^\d{4}-\d{2}$/.test(endYYYYMM)) return 0;
+      const [sy,sm]=startYYYYMM.split('-').map(Number);
+      const [ey,em]=endYYYYMM.split('-').map(Number);
+      return Math.max(0, (ey-sy)*12 + (em-sm) + 1); // inclusif: compte le mois en cours
+    }
+    function inferAmortStartForVehicle(vehId){
+      // 1) premier mois de location pour ce véhicule si dispo, sinon mois courant
+      const vehLocs = locations.filter(l=> l.vehiculeId===vehId).sort((a,b)=> new Date(a.date)-new Date(b.date));
+      if(vehLocs[0]) return monthKey(vehLocs[0].date);
+      const now = new Date(); const mk = `${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,'0')}`;
+      return mk;
+    }
+    function amortCumuleAtMonth(v, mk){
+      const c=v.costs||{};
+      const start = c.amortStart || inferAmortStartForVehicle(v.id);
+      const elapsed = monthsBetween(start, mk);
+      const perMonth = monthlyAmort(v);
+      const maxCum = Math.max(0,(c.totalInvested||0)-(c.residual||0));
+      return Math.min(maxCum, perMonth*elapsed);
+    }
+    function vncAtMonth(v, mk){
+      const c=v.costs||{};
+      const cum = amortCumuleAtMonth(v, mk);
+      const brut = Number(c.totalInvested||0);
+      const resi = Number(c.residual||0);
+      return Math.max(resi, brut - cum);
+    }
 
     // ===== Vehicles UI =====
     function renderVehiclesUI(){
       const active=vehicles.filter(v=> v.active);
-      ['vehicule','filterVehicule','simVehicule','suiviVehicule'].forEach(id=>{
+      ['vehicule','filterVehicule','suiviVehicule'].forEach(id=>{
         const el=$(id); if(!el) return; el.innerHTML='';
         if(id==='filterVehicule' || id==='suiviVehicule'){
           const optAll=document.createElement('option'); optAll.value='ALL'; optAll.textContent='Tous véhicules'; el.appendChild(optAll);
         }
         active.forEach(v=>{ const o=document.createElement('option'); o.value=v.id; o.textContent=v.name; el.appendChild(o); });
       });
-
-      // Default suivi: premier véhicule actif
-      const sel=$('suiviVehicule');
-      const firstActive=vehicles.find(v=>v.active);
-      if(firstActive && (!sel.dataset.setOnce || sel.value==='ALL')){
-        sel.value=firstActive.id; sel.dataset.setOnce='1';
-      }
+      const sel=$('suiviVehicule'); const firstActive=vehicles.find(v=>v.active); if(firstActive && (!sel.dataset.setOnce || sel.value==='ALL')){ sel.value=firstActive.id; sel.dataset.setOnce='1'; }
 
       // Cards
       const wrap=$('vehiclesList'); wrap.innerHTML='';
@@ -293,10 +252,11 @@
             <div><label>Entretien / mois</label><input type="number" step="0.1" value="${c.ent||0}" class="veh-ent" data-id="${v.id}"/></div>
             <div><label>Amort. (auto) / mois</label><input type="number" value="${amort.toFixed(2)}" disabled/></div>
           </div>
-          <div class="grid-3 mt-3">
+          <div class="grid-4 mt-3">
             <div><label>Total investi (€)</label><input type="number" step="0.1" value="${c.totalInvested||0}" class="veh-total" data-id="${v.id}"/></div>
-            <div><label>Valeur résiduelle estimée (€)</label><input type="number" step="0.1" value="${c.residual||0}" class="veh-resid" data-id="${v.id}"/></div>
+            <div><label>Valeur résiduelle (€)</label><input type="number" step="0.1" value="${c.residual||0}" class="veh-resid" data-id="${v.id}"/></div>
             <div><label>Durée amort. (mois)</label><input type="number" value="${c.amortMonths||60}" class="veh-months" data-id="${v.id}"/></div>
+            <div><label>Début amort. (YYYY-MM)</label><input type="month" value="${c.amortStart||''}" class="veh-amstart" data-id="${v.id}"/></div>
           </div>
           <div class="grid-3 mt-2">
             <div><label>Base amortissable</label><input type="text" value="${Math.max(0,(c.totalInvested||0)-(c.residual||0)).toFixed(2)} €" disabled/></div>
@@ -325,263 +285,232 @@
       wrap.querySelectorAll('.veh-total').forEach(i=> i.oninput = e=>{ const v=vehicleById(e.target.dataset.id); if(v){ v.costs.totalInvested=Number(e.target.value||0); saveAll(); renderVehiclesUI(); renderCharts(); }});
       wrap.querySelectorAll('.veh-resid').forEach(i=> i.oninput = e=>{ const v=vehicleById(e.target.dataset.id); if(v){ v.costs.residual=Number(e.target.value||0); saveAll(); renderVehiclesUI(); renderCharts(); }});
       wrap.querySelectorAll('.veh-months').forEach(i=> i.oninput = e=>{ const v=vehicleById(e.target.dataset.id); if(v){ v.costs.amortMonths=Math.max(1,Number(e.target.value||1)); saveAll(); renderVehiclesUI(); renderCharts(); }});
+      wrap.querySelectorAll('.veh-amstart').forEach(i=> i.oninput = e=>{ const v=vehicleById(e.target.dataset.id); if(v){ v.costs.amortStart=e.target.value||null; saveAll(); renderCharts(); }});
       wrap.querySelectorAll('.veh-usewear').forEach(i=> i.onchange = e=>{ const v=vehicleById(e.target.dataset.id); if(v){ v.costs.useWear=e.target.checked; saveAll(); renderCharts(); }});
     }
-    function addVehicle(){
-      const id='veh_'+Math.random().toString(36).slice(2,8);
-      vehicles.push({ id, name:'Nouveau véhicule', active:true, costs:{ass:0,conn:0,ent:0,totalInvested:0,residual:0,amortMonths:60,useWear:false} });
-      saveAll(); renderVehiclesUI(); renderTable(); renderCharts(); fillSimDefaults();
-    }
-    function removeVehicle(id){
-      if(!confirm('Supprimer ce véhicule ?')) return;
-      vehicles = vehicles.filter(v=> v.id!==id);
-      locations = locations.filter(l=> l.vehiculeId!==id);
-      saveAll(); renderVehiclesUI(); renderTable(); renderCharts(); fillSimDefaults();
-    }
-    function saveVehicles(){ saveAll(); alert('Véhicules sauvegardés ✅'); fillSimDefaults(); }
-
-    // ===== Globals =====
-    function loadGlobals(){ $('commission').value=globals.commission; $('wearPerKm').value=globals.wearPerKm; $('kmInclus').value=globals.kmInclus; }
-    function saveGlobals(){
-      globals.commission=Number($('commission').value||0);
-      globals.wearPerKm=Number($('wearPerKm').value||0);
-      globals.kmInclus=Number($('kmInclus').value||0);
-      saveAll(); $('savedTag').style.display='inline'; setTimeout(()=>{$('savedTag').style.display='none'},1200);
-    }
+    function addVehicle(){ const id='veh_'+Math.random().toString(36).slice(2,8); vehicles.push({ id, name:'Nouveau véhicule', active:true, costs:{ass:0,conn:0,ent:0,totalInvested:0,residual:0,amortMonths:60,amortStart:null,useWear:false} }); saveAll(); renderVehiclesUI(); renderTable(); renderCharts(); }
+    function removeVehicle(id){ if(!confirm('Supprimer ce véhicule ?')) return; vehicles = vehicles.filter(v=> v.id!==id); locations = locations.filter(l=> l.vehiculeId!==id); saveAll(); renderVehiclesUI(); renderTable(); renderCharts(); }
+    function saveVehicles(){ saveAll(); alert('Véhicules sauvegardés ✅'); }
 
     // ===== Tabs =====
-    function showTab(id){
-      document.querySelectorAll('section.card').forEach(s=> s.classList.add('hidden'));
-      document.getElementById(id).classList.remove('hidden');
-      if(id==='suivi') renderCharts();
-      if(id==='previsions') fillSimDefaults();
-      if(id==='vehicles') renderVehiclesUI();
-    }
+    function showTab(id){ document.querySelectorAll('section.card').forEach(s=> s.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); if(id==='suivi') renderCharts(); if(id==='vehicles') renderVehiclesUI(); }
 
     // ===== Locations =====
     function saveLocation(){
       const date=$('date').value; if(!date) return alert('Choisis une date');
-      const obj={ date,
-        jours:Number($('jours').value||1), prixJour:Number($('prixJour').value||0),
+      const netField=$('netOverride').value;
+      const obj={
+        date, jours:Number($('jours').value||1), prixJour:Number($('prixJour').value||0),
         kms:$('kms').value?Number($('kms').value):0, extras:Number($('extras').value||0),
         fuelAdj:Number($('fuelAdj').value||0), notes:$('notes').value||'',
-        vehiculeId:$('vehicule').value
+        vehiculeId:$('vehicule').value, netOverride:(netField!==''?Number(netField):null)
       };
       if(editId){ locations=locations.map(l=> l.id===editId? {...l,...obj}:l); editId=null; $('cancelEditBtn').classList.add('hidden'); $('saveBtn').textContent='Enregistrer'; }
       else { const id=crypto.randomUUID?crypto.randomUUID():String(Date.now()); locations.push({id,...obj}); }
       saveAll(); clearLocForm(); renderTable(); renderCharts();
     }
     function cancelEdit(){ editId=null; clearLocForm(); $('cancelEditBtn').classList.add('hidden'); $('saveBtn').textContent='Enregistrer'; }
-    function clearLocForm(){ $('date').value=''; $('jours').value=1; $('prixJour').value=30; $('kms').value=''; $('extras').value='0'; $('fuelAdj').value='0'; $('notes').value=''; }
+    function clearLocForm(){ $('date').value=''; $('jours').value=1; $('prixJour').value=30; $('kms').value=''; $('extras').value='0'; $('fuelAdj').value='0'; $('netOverride').value=''; $('notes').value=''; }
     function removeLoc(id){ locations=locations.filter(l=> l.id!==id); saveAll(); renderTable(); renderCharts(); }
     function editLoc(id){
-      const l=locations.find(x=>x.id===id); if(!l) return;
-      editId=id; $('date').value=l.date||''; $('jours').value=l.jours??1; $('prixJour').value=l.prixJour??0; $('kms').value=l.kms??''; $('extras').value=l.extras??0; $('fuelAdj').value=l.fuelAdj??0; $('notes').value=l.notes||'';
+      const l=locations.find(x=>x.id===id); if(!l) return; editId=id;
+      $('date').value=l.date||''; $('jours').value=l.jours??1; $('prixJour').value=l.prixJour??0; $('kms').value=l.kms??'';
+      $('extras').value=l.extras??0; $('fuelAdj').value=l.fuelAdj??0; $('notes').value=l.notes||'';
+      $('netOverride').value=(l.netOverride!==null && l.netOverride!==undefined)? l.netOverride : '';
       $('vehicule').value=l.vehiculeId; $('cancelEditBtn').classList.remove('hidden'); $('saveBtn').textContent='Mettre à jour'; window.scrollTo({top:0,behavior:'smooth'});
     }
-
+    function duplicateLoc(id){
+      const l=locations.find(x=>x.id===id); if(!l) return;
+      const copy={...l, id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())), notes:(l.notes? l.notes+" (dup)" : "(dup)")};
+      locations.unshift(copy); saveAll(); renderTable(); renderCharts();
+    }
+    function makeEditable(td, initialValue, type, onSave, step){
+      const input=document.createElement('input'); input.type=type||'text'; if(step) input.step=step; input.value=initialValue ?? ''; input.style.width='100%';
+      input.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ input.blur(); }});
+      input.addEventListener('blur', ()=>{ onSave(input.value); });
+      td.innerHTML=''; td.appendChild(input); input.focus(); input.select?.();
+    }
+    function attachInlineEditors(tr, l){
+      const map=[
+        {sel:'.cell-jours', field:'jours', type:'number'},
+        {sel:'.cell-prix', field:'prixJour', type:'number', step:'0.1'},
+        {sel:'.cell-kms', field:'kms', type:'number'},
+        {sel:'.cell-extras', field:'extras', type:'number', step:'0.1'},
+        {sel:'.cell-fuel', field:'fuelAdj', type:'number', step:'0.1'},
+        {sel:'.cell-notes', field:'notes', type:'text'}
+      ];
+      map.forEach(({sel,field,type,step})=>{
+        const td=tr.querySelector(sel); if(!td) return;
+        td.title='Double-clic pour éditer';
+        td.ondblclick=()=>{ const startVal=(field==='notes')? (l.notes||'') : Number(l[field]||0);
+          makeEditable(td, startVal, type, (val)=>{ if(field==='notes'){ l.notes=String(val||''); } else { l[field]=Number(val||0); } saveAll(); renderTable(); renderCharts(); }, step);
+        };
+      });
+      const tdNet=tr.querySelector('.cell-net');
+      if(tdNet){
+        tdNet.title='Double-clic pour saisir un net reçu (override)';
+        tdNet.ondblclick=()=>{
+          const startVal=(l.netOverride!==null && l.netOverride!==undefined)? Number(l.netOverride) : netLocation(l);
+          makeEditable(tdNet, startVal, 'number', (val)=>{
+            const num=(val===null || val==='')? null : Number(val);
+            l.netOverride=(val===null || val==='')? null : (Number.isNaN(num)? null : num); saveAll(); renderTable(); renderCharts();
+          }, '0.1');
+        };
+      }
+    }
     function netLocation(l){
+      if(l.netOverride!==null && l.netOverride!==undefined && !Number.isNaN(Number(l.netOverride))){ return Number(l.netOverride); }
       const com=(globals.commission||0)/100;
       const after=(l.prixJour*(l.jours||1))*(1-com);
-      const v = vehicleById(l.vehiculeId);
-      const wearRate = (globals.wearPerKm||0);
-      const wear = (v?.costs?.useWear ? ((l.kms||0) * wearRate) : 0);
+      const v=vehicleById(l.vehiculeId);
+      const wearRate=(globals.wearPerKm||0);
+      const wear=(v?.costs?.useWear ? ((l.kms||0) * wearRate) : 0);
       return after - wear - (l.extras||0) + (l.fuelAdj||0);
     }
 
-    // Table Locations + filtres
-    function clearFilters(){ $('filterVehicule').value='ALL'; $('filterMonth').value=''; renderTable(); }
-    function fillFilters(){
-      const filt=$('filterVehicule'); filt.innerHTML='';
-      const optAll=document.createElement('option'); optAll.value='ALL'; optAll.textContent='Tous véhicules'; filt.appendChild(optAll);
-      vehicles.filter(v=>v.active).forEach(v=>{ const o=document.createElement('option'); o.value=v.id; o.textContent=v.name; filt.appendChild(o); });
-    }
-    function fillVehSelect(){
-      const sel=$('vehicule'); sel.innerHTML='';
-      vehicles.filter(v=>v.active).forEach(v=>{ const o=document.createElement('option'); o.value=v.id; o.textContent=v.name; sel.appendChild(o); });
-    }
+    // Table + filtres
+    function clearFilters(){ $('filterVehicule').value='ALL'; $('filterMonth').value=''; $('filterNotes').value=''; renderTable(); }
+    function fillFilters(){ const filt=$('filterVehicule'); filt.innerHTML=''; const optAll=document.createElement('option'); optAll.value='ALL'; optAll.textContent='Tous véhicules'; filt.appendChild(optAll); vehicles.filter(v=>v.active).forEach(v=>{ const o=document.createElement('option'); o.value=v.id; o.textContent=v.name; filt.appendChild(o); }); }
+    function fillVehSelect(){ const sel=$('vehicule'); sel.innerHTML=''; vehicles.filter(v=>v.active).forEach(v=>{ const o=document.createElement('option'); o.value=v.id; o.textContent=v.name; sel.appendChild(o); }); }
     function renderTable(){
       const tbody=$('locTable'); tbody.innerHTML='';
-      const m=$('filterMonth').value; const vf=$('filterVehicule').value||'ALL';
-      const arr=locations.slice().sort((a,b)=> new Date(b.date)-new Date(a.date)).filter(l=> (!m||monthKey(l.date)===m) && (vf==='ALL'||l.vehiculeId===vf));
+      const m=$('filterMonth').value; const vf=$('filterVehicule').value||'ALL'; const q=($('filterNotes').value||'').toLowerCase();
+      const arr=locations.slice().sort((a,b)=> new Date(b.date)-new Date(a.date)).filter(l=> (!m||monthKey(l.date)===m) && (vf==='ALL'||l.vehiculeId===vf) && (!q || (l.notes||'').toLowerCase().includes(q)) );
       for(const l of arr){
         const v=vehicleById(l.vehiculeId); const net=netLocation(l);
-        const tr=document.createElement('tr');
+        const overrideUsed=(l.netOverride!==null && l.netOverride!==undefined && !Number.isNaN(Number(l.netOverride)));
+        const tr=document.createElement('tr'); tr.dataset.id=l.id;
+        if(ui.selectedId===l.id) tr.classList.add('row-selected');
         tr.innerHTML=`
-          <td>${l.date}</td><td>${l.jours||1}</td>
-          <td>${(Number(l.prixJour)||0).toFixed(2)}</td>
-          <td>${l.kms||'-'}</td>
-          <td>${(l.extras||0).toFixed(2)}</td>
-          <td>${(l.fuelAdj||0).toFixed(2)}</td>
-          <td>${v? v.name : '—'}</td>
-          <td><span class="pill" style="background:${net>=0?'rgba(22,163,74,.18)':'rgba(239,68,68,.18)'};color:${net>=0?'#16a34a':'#ef4444'}">${net.toFixed(2)}€</span></td>
-          <td title="${(l.notes||'').replace(/"/g,'&quot;')}" style="max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${l.notes||''}</td>
+          <td class="cell-date">${l.date}</td>
+          <td class="cell-jours">${l.jours||1}</td>
+          <td class="cell-prix">${(Number(l.prixJour)||0).toFixed(2)}</td>
+          <td class="cell-kms">${l.kms||'-'}</td>
+          <td class="cell-extras">${(l.extras||0).toFixed(2)}</td>
+          <td class="cell-fuel">${(l.fuelAdj||0).toFixed(2)}</td>
+          <td class="cell-veh">${v? v.name : '—'}</td>
+          <td class="cell-net">
+            <span class="pill" style="background:${net>=0?'rgba(22,163,74,.18)':'rgba(239,68,68,.18)'};color:${net>=0?'#16a34a':'#ef4444'}" title="${overrideUsed?'Valeur saisie manuellement (override)':'Calcul automatique'}">${net.toFixed(2)}€</span>
+            ${overrideUsed? '<span class="ml-2 text-xs badge">Saisi</span>' : ''}
+          </td>
+          <td class="cell-notes" title="${(l.notes||'').replace(/"/g,'&quot;')}" style="max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${l.notes||''}</td>
           <td class="whitespace-nowrap">
             <button class="btn-ghost" onclick="editLoc('${l.id}')">✏️</button>
+            <button class="btn-ghost" onclick="duplicateLoc('${l.id}')">📄</button>
             <button class="btn-ghost" onclick="removeLoc('${l.id}')">🗑️</button>
           </td>`;
+        tr.addEventListener('click', ()=>{ ui.selectedId=l.id; saveAll(); renderTable(); });
         tbody.appendChild(tr);
+        attachInlineEditors(tr, l);
       }
     }
     $('filterMonth').addEventListener('change', renderTable);
     $('filterVehicule').addEventListener('change', renderTable);
+    $('filterNotes').addEventListener('input', renderTable);
+    const compactToggle=$('compactToggle'); compactToggle.checked=!!ui.compact; compactToggle.addEventListener('change', ()=>{ ui.compact=compactToggle.checked; saveAll(); document.body.classList.toggle('compact', ui.compact); });
 
-    // ===== Prévisions =====
-    let simChart;
-    function fillSimDefaults(){
-      const sel=$('simVehicule'); sel.innerHTML='';
-      vehicles.filter(v=>v.active).forEach(v=>{ const o=document.createElement('option'); o.value=v.id; o.textContent=v.name; sel.appendChild(o); });
-      $('simCommission').value=globals.commission; $('simWear').value=globals.wearPerKm;
-      if(!sel.value && vehicles.filter(v=>v.active)[0]) sel.value=vehicles.filter(v=>v.active)[0].id;
-    }
-    function runSim(){
-      const vehId=$('simVehicule').value; const veh=vehicleById(vehId); if(!veh) return alert('Ajoute un véhicule actif.');
-      const days=Number($('simDays').value||0), price=Number($('simPrice').value||0), kmday=Number($('simKmDay').value||0);
-      const commission=Number($('simCommission').value||globals.commission), wearPerKm=Number($('simWear').value||globals.wearPerKm), seasonBase=Number($('simSeasonBase').value||100)/100;
-      const com=commission/100, fixed=fixedCostsMonthly(veh);
-      const seasonCurve=[0.85,0.80,0.90,1.00,1.05,1.15,1.25,1.20,1.00,0.95,0.85,0.90];
-      const shownPrice = price/(1-com);
-      const monthlyGross=price*days, after=monthlyGross*(1-com);
-      const useWear = !!veh?.costs?.useWear;
-      const wearMonthly = useWear ? (kmday*days)*wearPerKm : 0;
-
-      // Prix proprio minimum d’équilibre
-      let pMin = Infinity, pMinShown = Infinity;
-      if(days > 0 && (1-com) > 0){
-        pMin = (fixed + wearMonthly) / (days*(1-com));
-        pMinShown = pMin / (1-com);
-      }
-
-      $('simSummary').innerHTML=`
-        <div class="card"><div class="text-sm hint">Prix proprio / Prix affiché estimé</div><div class="text-xl font-extrabold">${euro(price)} / ${euro(shownPrice)}</div></div>
-        <div class="card"><div class="text-sm hint">Après com – ${useWear?'Usure':'Usure ignorée'}</div><div class="text-xl font-extrabold">${euro(after)} – ${euro(wearMonthly)}</div></div>
-        <div class="card"><div class="text-sm hint">Fixes mensuels (${veh.name})</div><div class="text-xl font-extrabold">-${euro(fixed)}</div><div class="text-xs hint">(incl. amort. basé sur Total – Résiduelle)</div></div>
-        <div class="card">
-          <div class="text-sm hint">🎯 Prix proprio minimum (équilibre)</div>
-          <div class="text-xl font-extrabold">${isFinite(pMin)?euro(pMin):'—'} <span class="text-sm hint">(${isFinite(pMinShown)?euro(pMinShown):'—'} affiché)</span></div>
-          <div class="mt-2">
-            <button class="btn-ghost" onclick="(function(){ if(!isFinite(${pMin})) return; $('simPrice').value='${(pMin.toFixed? pMin.toFixed(2) : '0')}'; })()">⬅️ Appliquer ce prix</button>
-          </div>
-        </div>
-      `;
-
-      const tbody=$('simTable'); tbody.innerHTML='';
-      const labels=['01','02','03','04','05','06','07','08','09','10','11','12']; const dataBar=[];
-      labels.forEach((m,i)=>{
-        const factor=seasonCurve[i]*seasonBase;
-        const g=monthlyGross*factor, a=g*(1-com);
-        const w = useWear ? (kmday*days)*wearPerKm*factor : 0;
-        const n=a-w-fixed;
-        dataBar.push(n);
-        const tr=document.createElement('tr'); tr.innerHTML=`<td>${m}</td><td>${euro(g)}</td><td>${euro(a)}</td><td>${euro(w)}</td><td>${euro(fixed)}</td><td><b>${euro(n)}</b></td>`; tbody.appendChild(tr);
-      });
-
-      if(simChart) simChart.destroy();
-      simChart=new Chart(document.getElementById('simChart').getContext('2d'), {
-        type:'bar',
-        data:{ labels, datasets:[{ label:`Net mensuel – ${veh.name}`, data:dataBar, backgroundColor:dataBar.map(v=> v>=0?'rgba(79,70,229,.9)':'rgba(239,68,68,.9)') }]},
-        options:{ plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true}} }
-      });
-
-      const wi=[{lbl:'+2j', d:days+2,p:price},{lbl:'-2j',d:Math.max(0,days-2),p:price},{lbl:'+5€',d:days,p:price+5},{lbl:'-5€',d:days,p:Math.max(0,price-5)},{lbl:'+2j & +5€',d:days+2,p:price+5}];
-      const wrap=$('simWhatIf'); wrap.innerHTML='';
-      wi.forEach(s=>{
-        const g=s.p*s.d,a=g*(1-com),w=(useWear?(kmday*s.d)*wearPerKm:0),n=a-w-fixed;
-        const c=document.createElement('div'); c.className='card';
-        c.innerHTML=`<div class="text-sm hint">${s.lbl}</div><div class="text-lg font-extrabold">${euro(n)}</div><div class="text-xs hint">CA ${euro(g)} · Après com ${euro(a)} · Usure ${euro(w)}</div>`;
-        wrap.appendChild(c);
-      });
-    }
-
-    // ===== Suivi (avec prorata multi-mois) =====
+    // ===== Suivi (prorata multi-mois + occupation + VNC + tableau) =====
     let chartNet, chartCumul;
     function renderCharts(){
       const sel=$('suiviVehicule'); sel.innerHTML='';
-      const active = vehicles.filter(v=>v.active);
+      const active=vehicles.filter(v=>v.active);
       const optAll=document.createElement('option'); optAll.value='ALL'; optAll.textContent='Tous véhicules'; sel.appendChild(optAll);
       active.forEach(v=>{ const o=document.createElement('option'); o.value=v.id; o.textContent=v.name; sel.appendChild(o); });
       if(!sel.value || (!sel.dataset.setOnce && active[0])){ sel.value = active[0]?.id || 'ALL'; sel.dataset.setOnce='1'; }
+      const vehF=sel.value; const mSel=$('suiviMonth').value;
 
-      const vehF=sel.value;
-      const mSel=$('suiviMonth').value;
-
-      // Locations filtrées par véhicule (on ventile ensuite par mois)
-      const filtered = locations.filter(l => (vehF==='ALL' || l.vehiculeId===vehF));
-
-      // Agrégation proratisée par mois
-      const monthsNetMap={}; // {'YYYY-MM': netAvantFixes}
+      const filtered=locations.filter(l=> (vehF==='ALL' || l.vehiculeId===vehF));
+      const monthsNetMap={}; const monthsDaysMap={};
       filtered.forEach(l=>{
         const piece=splitLocationNetByMonth(l);
-        Object.entries(piece).forEach(([mk,val])=>{
-          if(!mSel || mk===mSel){
-            monthsNetMap[mk]=(monthsNetMap[mk]||0)+val;
-          }
-        });
+        Object.entries(piece).forEach(([mk,val])=>{ if(!mSel || mk===mSel){ monthsNetMap[mk]=(monthsNetMap[mk]||0)+val; } });
+        const pieceDays=splitLocationDaysByMonth(l);
+        Object.entries(pieceDays).forEach(([mk,val])=>{ if(!mSel || mk===mSel){ monthsDaysMap[mk]=(monthsDaysMap[mk]||0)+val; } });
       });
 
       const months=Object.keys(monthsNetMap).sort();
-
-      // Frais fixes selon sélection
       let monthlyBefore=[], monthlyFix=[], monthlyAfter=[];
       if(vehF==='ALL'){
-        monthlyBefore = months.map(m => monthsNetMap[m]||0);
-        monthlyFix    = months.map(_ => active.reduce((s,v)=> s + fixedCostsMonthly(v), 0));
+        monthlyBefore=months.map(m=> monthsNetMap[m]||0);
+        monthlyFix=months.map(_=> active.reduce((s,v)=> s+fixedCostsMonthly(v),0));
       } else {
-        monthlyBefore = months.map(m => monthsNetMap[m]||0);
+        monthlyBefore=months.map(m=> monthsNetMap[m]||0);
         const vSel=vehicleById(vehF);
-        monthlyFix = months.map(_ => fixedCostsMonthly(vSel));
+        monthlyFix=months.map(_=> fixedCostsMonthly(vSel));
       }
-      monthlyAfter = monthlyBefore.map((v,i)=> v - monthlyFix[i]);
+      monthlyAfter=monthlyBefore.map((v,i)=> v - monthlyFix[i]);
 
-      // Résumé mois sélectionné
       const currentM = mSel || months[months.length-1];
       const top=$('monthTop'), bd=$('monthBreakdown');
       if(currentM){
-        const before = monthsNetMap[currentM] || 0;
-        const fixSel = (vehF==='ALL'
-          ? vehicles.filter(v=>v.active).reduce((s,v)=> s+fixedCostsMonthly(v), 0)
-          : fixedCostsMonthly(vehicleById(vehF))
-        );
-        const after = before - fixSel;
-        top.innerHTML=`${currentM||'—'} · Net (avant fixes): <b>${euro(before)}</b> · Fixes: <b>-${euro(fixSel)}</b> · Résultat net: <b style="color:${after>=0?'var(--pos)':'var(--neg)'}">${euro(after)}</b>`;
+        const before=monthsNetMap[currentM]||0;
+        const fixSel=(vehF==='ALL' ? vehicles.filter(v=>v.active).reduce((s,v)=> s+fixedCostsMonthly(v),0) : fixedCostsMonthly(vehicleById(vehF)));
+        const after=before - fixSel;
+        const [yy,mm]=(currentM||'').split('-').map(Number);
+        const daysInMonth=new Date(yy, mm, 0).getDate();
+        const rentedDays=monthsDaysMap[currentM]||0;
+        const capacity=(vehF==='ALL'? (daysInMonth * active.length) : daysInMonth);
+        const occ=capacity>0 ? (rentedDays/capacity) : 0;
+        const occPct=(occ*100).toFixed(0)+'%';
+        const occStyle=(occ>=0.40)?'background:rgba(22,163,74,.18);color:#16a34a':'background:rgba(239,68,68,.18);color:#ef4444';
+        // VNC (single veh or total)
+        let vncDisplay='—';
+        if(vehF==='ALL'){
+          const totalVNC = active.reduce((s,v)=> s + vncAtMonth(v, currentM), 0);
+          vncDisplay = euro(totalVNC);
+        } else {
+          const vSel=vehicleById(vehF);
+          vncDisplay = euro(vncAtMonth(vSel, currentM));
+        }
 
-        // Breakdown cartes
+        const occBadge=`<span class="ml-2 text-xs badge" style="${occStyle}">Occupation ${occPct}</span>`;
+        top.innerHTML=`${currentM||'—'} · Net (avant fixes): <b>${euro(before)}</b> · Fixes: <b>-${euro(fixSel)}</b> · Résultat net: <b style="color:${after>=0?'var(--pos)':'var(--neg)'}">${euro(after)}</b> · VNC: <b>${vncDisplay}</b> ${occBadge} <span class="hint">(${rentedDays}/${capacity} j)</span>`;
+
+        // Breakdown cards
         bd.innerHTML='';
         if(vehF==='ALL'){
           active.forEach(v=>{
             const b=fixedCostsBreakdown(v);
             const card=document.createElement('div'); card.className='card';
-            card.innerHTML=`<div class="text-sm hint">${v.name} – Détail fixes</div>
+            const vVnc = vncAtMonth(v, currentM);
+            card.innerHTML=`
+              <div class="text-sm hint">${v.name} – Détail fixes</div>
               <div class="grid-3 mt-2">
                 <div><div class="text-xs hint">Assurance</div><div class="text-lg font-bold">${euro(b.ass)}</div></div>
                 <div><div class="text-xs hint">Connect</div><div class="text-lg font-bold">${euro(b.conn)}</div></div>
                 <div><div class="text-xs hint">Entretien</div><div class="text-lg font-bold">${euro(b.ent)}</div></div>
                 <div><div class="text-xs hint">Amort. (Total - Résiduelle) ÷ ${b.months}</div><div class="text-lg font-bold">${euro(b.amort)}</div></div>
+                <div><div class="text-xs hint">VNC (${currentM})</div><div class="text-lg font-bold">${euro(vVnc)}</div></div>
               </div>`;
             bd.appendChild(card);
           });
-          const total = active.reduce((s,v)=> s+fixedCostsMonthly(v), 0);
+          const total=active.reduce((s,v)=> s+fixedCostsMonthly(v),0);
+          const totalVnc=active.reduce((s,v)=> s+vncAtMonth(v,currentM),0);
           const cardTot=document.createElement('div'); cardTot.className='card';
-          cardTot.innerHTML=`<div class="text-sm hint">Total véhicules actifs – Fixes</div><div class="text-2xl font-extrabold">${euro(total)}</div>`;
+          cardTot.innerHTML=`<div class="text-sm hint">Total véhicules actifs – Fixes & VNC</div><div class="text-2xl font-extrabold">${euro(total)} fixes · VNC ${euro(totalVnc)}</div>`;
           bd.appendChild(cardTot);
         } else {
-          const v=vehicleById(vehF); const b=fixedCostsBreakdown(v);
+          const v=vehicleById(vehF); const b=fixedCostsBreakdown(v); const vVnc=vncAtMonth(v,currentM);
           const card=document.createElement('div'); card.className='card';
-          card.innerHTML=`<div class="text-sm hint">${v.name} – Détail fixes</div>
+          card.innerHTML=`
+            <div class="text-sm hint">${v.name} – Détail fixes</div>
             <div class="grid-3 mt-2">
               <div><div class="text-xs hint">Assurance</div><div class="text-lg font-bold">${euro(b.ass)}</div></div>
               <div><div class="text-xs hint">Connect</div><div class="text-lg font-bold">${euro(b.conn)}</div></div>
               <div><div class="text-xs hint">Entretien</div><div class="text-lg font-bold">${euro(b.ent)}</div></div>
               <div><div class="text-xs hint">Amort. (Total - Résiduelle) ÷ ${b.months}</div><div class="text-lg font-bold">${euro(b.amort)}</div></div>
+              <div><div class="text-xs hint">VNC (${currentM})</div><div class="text-lg font-bold">${euro(vVnc)}</div></div>
             </div>`;
           bd.appendChild(card);
         }
+
+        // === Vue tableau (€/%, VNC) ===
+        renderSuiviTable(months, monthlyBefore, monthlyFix, currentM, vehF);
       } else {
-        top.textContent='Aucune donnée';
-        bd.innerHTML='';
+        top.textContent='Aucune donnée'; bd.innerHTML='';
+        renderSuiviTable([], [], [], null, 'ALL');
       }
 
-      // Charts
       if(chartNet) chartNet.destroy(); if(chartCumul) chartCumul.destroy();
       chartNet=new Chart(document.getElementById('chartNet').getContext('2d'), {
         type:'bar',
@@ -598,44 +527,103 @@
     document.getElementById('suiviVehicule')?.addEventListener('change', renderCharts);
     document.getElementById('suiviMonth')?.addEventListener('change', renderCharts);
 
+    function renderSuiviTable(months, beforeArr, fixArr, currentM, vehF){
+      const tbody = document.querySelector('#suiviTable tbody'); tbody.innerHTML='';
+      const rows = months.map((mk, i)=>{
+        const before = beforeArr[i]||0;
+        const fixes  = fixArr[i]||0;
+        const net    = before - fixes;
+        const margin = before>0 ? (net/before*100) : 0;
+        // VNC: single veh or total
+        let vnc = 0;
+        if(vehF==='ALL'){
+          const act = vehicles.filter(v=>v.active);
+          vnc = act.reduce((s,v)=> s + vncAtMonth(v, mk), 0);
+        } else {
+          const vSel = vehicleById(vehF); vnc = vncAtMonth(vSel, mk);
+        }
+        return { mk, before, fixes, net, margin, vnc };
+      });
+
+      // Si on filtre un mois précis, n’afficher que ce mois
+      const filteredRows = currentM ? rows.filter(r=> r.mk===currentM) : rows;
+      filteredRows.forEach(r=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${r.mk}</td>
+          <td>${euro(r.before)}</td>
+          <td>${euro(r.fixes)}</td>
+          <td style="color:${r.net>=0?'var(--pos)':'var(--neg)'}">${euro(r.net)}</td>
+          <td>${(r.margin).toFixed(1)}%</td>
+          <td>${euro(r.vnc)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
     // ===== Export / Import =====
     document.getElementById('exportJson').addEventListener('click', ()=>{
       const blob=new Blob([JSON.stringify({theme: themeToggle.checked?'light':'dark', vehicles, globals, locations}, null, 2)], {type:'application/json'});
-      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`roi-data-${new Date().toISOString().slice(0,10)}.json`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),0);
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+      a.download=`roi-data-${new Date().toISOString().slice(0,10)}.json`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),0);
     });
     document.getElementById('importJson').addEventListener('change', e=>{
-      const f=e.target.files?.[0]; if(!f) return;
-      const r=new FileReader(); r.onload=()=>{ try{
+      const f=e.target.files?.[0]; if(!f) return; const r=new FileReader();
+      r.onload=()=>{ try{
         const d=JSON.parse(r.result);
         if(d.theme){ themeToggle.checked=(d.theme==='light'); applyTheme(); }
-        if(Array.isArray(d.vehicles)) vehicles=d.vehicles.map(v=> ({...v, costs:{...v.costs, residual: v.costs?.residual ?? 0, useWear: v.costs?.useWear ?? false}}));
+        if(Array.isArray(d.vehicles)) vehicles=d.vehicles.map(v=> ({...v, costs:{ass:0,conn:0,ent:0,totalInvested:0,residual:0,amortMonths:60,amortStart:null,useWear:false, ...(v.costs||{})}}));
         if(d.globals) globals=d.globals;
-        if(Array.isArray(d.locations)) locations=d.locations;
-        saveAll(); renderVehiclesUI(); fillVehSelect(); fillFilters(); renderTable(); renderCharts(); fillSimDefaults(); alert('Import réussi ✅');
-      }catch(_){ alert('Fichier invalide ❌'); } }; r.readAsText(f);
-    });
-    document.getElementById('exportCsv').addEventListener('click', ()=>{
-      const rows=[['id','date','jours','prixJour','kms','extras','fuelAdj','vehicule','net','notes']];
-      locations.forEach(l=> rows.push([l.id,l.date,l.jours,l.prixJour,l.kms,l.extras,l.fuelAdj||0,(vehicleById(l.vehiculeId)?.name||''),netLocation(l).toFixed(2),(l.notes||'').replace(/"/g,'""')]));
-      const csv=rows.map(r=> r.map(x=>`"${String(x)}"`).join(',')).join('\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
-      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='locations.csv'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),0);
+        if(Array.isArray(d.locations)) locations=d.locations.map(l=> ({...l, netOverride: (l.netOverride!==undefined ? l.netOverride : (l.net_recu!==undefined ? l.net_recu : null))}));
+        saveAll(); renderVehiclesUI(); fillVehSelect(); fillFilters(); renderTable(); renderCharts(); alert('Import réussi ✅');
+      }catch(_){ alert('Fichier invalide ❌'); } };
+      r.readAsText(f);
     });
 
-    // ===== Prévisions init =====
-    function fillSimDefaults(){
-      const sel=$('simVehicule'); sel.innerHTML='';
-      vehicles.filter(v=>v.active).forEach(v=>{ const o=document.createElement('option'); o.value=v.id; o.textContent=v.name; sel.appendChild(o); });
-      $('simCommission').value=globals.commission; $('simWear').value=globals.wearPerKm;
-      if(!sel.value && vehicles.filter(v=>v.active)[0]) sel.value=vehicles.filter(v=>v.active)[0].id;
+    // Export CSV: suivi (mois courant ou tout si pas de filtre)
+    function exportSuiviCsv(){
+      const vehF = $('suiviVehicule')?.value || 'ALL';
+      const mSel = $('suiviMonth')?.value || '';
+      const filtered=locations.filter(l=> (vehF==='ALL' || l.vehiculeId===vehF));
+      const monthsNetMap={}; const monthsFixMap={};
+      filtered.forEach(l=>{
+        const piece=splitLocationNetByMonth(l);
+        Object.entries(piece).forEach(([mk,val])=>{ if(!mSel || mk===mSel){ monthsNetMap[mk]=(monthsNetMap[mk]||0)+val; } });
+      });
+      const months=Object.keys(monthsNetMap).sort();
+      const rows = months.map(mk=>{
+        const before = monthsNetMap[mk]||0;
+        let fixes = 0;
+        if(vehF==='ALL'){ fixes = vehicles.filter(v=>v.active).reduce((s,v)=> s+fixedCostsMonthly(v),0); }
+        else { fixes = fixedCostsMonthly(vehicleById(vehF)); }
+        const net = before - fixes;
+        const margin = before>0 ? (net/before*100) : 0;
+        const vnc = (vehF==='ALL') ? vehicles.filter(v=>v.active).reduce((s,v)=> s+vncAtMonth(v,mk),0) : vncAtMonth(vehicleById(vehF), mk);
+        return { mk, before, fixes, net, margin, vnc };
+      });
+      const header = "mois;net_avant_fixes;fixes;net;marge_pct;vnc\n";
+      const body = rows.map(r=> [r.mk, r.before.toFixed(2), fixesRound(r.fixes), r.net.toFixed(2), r.margin.toFixed(1), r.vnc.toFixed(2)].join(';')).join('\n');
+      const blob = new Blob([header+body], {type:'text/csv;charset=utf-8;'});
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`suivi-${vehF}-${mSel||'all'}.csv`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),0);
+      function fixesRound(n){ return (n||0).toFixed(2); }
     }
+
+    // ===== Raccourcis clavier =====
+    function isTypingInInput(){ const a=document.activeElement; return a && (a.tagName==='INPUT' || a.tagName==='TEXTAREA'); }
+    document.addEventListener('keydown', (e)=>{
+      if(e.ctrlKey && e.key.toLowerCase()==='s'){ e.preventDefault(); saveLocation(); return; }
+      if(isTypingInInput()) return;
+      if(e.key.toLowerCase()==='n'){ e.preventDefault(); showTab('locations'); $('date').focus(); return; }
+      if(e.key.toLowerCase()==='d' && ui.selectedId){ e.preventDefault(); duplicateLoc(ui.selectedId); return; }
+      if(e.key.toLowerCase()==='e' && ui.selectedId){ e.preventDefault(); editLoc(ui.selectedId); return; }
+      if((e.key==='Delete' || e.key==='Backspace') && ui.selectedId){ e.preventDefault(); removeLoc(ui.selectedId); return; }
+    });
 
     // ===== Init =====
     function init(){
-      if(!vehicles.find(v=>v.id==='clio')) vehicles.push({ id:'clio', name:'Clio', active:true, costs:{ass:56,conn:25,ent:45,totalInvested:11659,residual:0,amortMonths:60,useWear:false} });
-      if(!vehicles.find(v=>v.id==='tesla')) vehicles.push({ id:'tesla', name:'Tesla', active:true, costs:{ass:115,conn:0,ent:30,totalInvested:0,residual:0,amortMonths:60,useWear:false} });
-
-      renderVehiclesUI(); fillVehSelect(); fillFilters(); loadGlobals(); renderTable(); renderCharts(); fillSimDefaults();
-      showTab('suivi'); // démarrage sur le Suivi
+      if(!vehicles.find(v=>v.id==='clio')) vehicles.push({ id:'clio', name:'Clio', active:true, costs:{ass:56,conn:25,ent:45,totalInvested:11659,residual:0,amortMonths:60,amortStart:null,useWear:false} });
+      if(!vehicles.find(v=>v.id==='tesla')) vehicles.push({ id:'tesla', name:'Tesla', active:true, costs:{ass:115,conn:0,ent:30,totalInvested:0,residual:0,amortMonths:60,amortStart:null,useWear:false} });
+      renderVehiclesUI(); fillVehSelect(); fillFilters(); renderTable(); renderCharts(); showTab('suivi');
     }
     init();
   </script>
