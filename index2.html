@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Dashboard ROI - Flotte Auto (v9)</title>
+  <title>Dashboard ROI - Flotte Auto (v10)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -17,6 +17,7 @@
     .btn-ghost{ background:transparent; border:1px solid var(--border); border-radius:.7rem; padding:.5rem .8rem; color:var(--text); }
     input,select{ background:rgba(255,255,255,.03); color:var(--text); border:1px solid var(--border); border-radius:.6rem; padding:.55rem .65rem; width:100%; transition:border-color .2s; }
     input.error{ border-color:var(--neg); box-shadow:0 0 0 2px rgba(239,68,68,.2); }
+    input.valid{ border-color:var(--pos); box-shadow:0 0 0 2px rgba(22,163,74,.2); }
     label{ color:var(--muted); font-size:.9rem; }
     table{ width:100%; border-collapse:collapse; } th,td{ border-bottom:1px solid var(--border); padding:.55rem .6rem; } th{ color:var(--muted); text-align:left; }
     .pill{ font-size:.75rem; font-weight:800; padding:.2rem .55rem; border-radius:999px; }
@@ -35,18 +36,22 @@
     .compact .pill{ font-size:.7rem; padding:.15rem .4rem; }
     .toast{ position:fixed; top:20px; right:20px; padding:1rem 1.5rem; border-radius:.5rem; color:#fff; z-index:1000; transform:translateX(100%); transition:transform .3s; font-weight:500; }
     .toast.show{ transform:translateX(0); }
-    .occ-badge{ padding:.2rem .5rem; border-radius:.5rem; font-size:.8rem; font-weight:600; }
+    .occ-badge, .alert-badge{ padding:.2rem .5rem; border-radius:.5rem; font-size:.8rem; font-weight:600; }
     .occ-good{ background:var(--pos); color:#fff; }
     .occ-warn{ background:var(--warn); color:#fff; }
     .occ-bad{ background:var(--neg); color:#fff; }
+    .alert-warn{ background:var(--warn); color:#fff; }
+    .alert-bad{ background:var(--neg); color:#fff; }
     .highlight{ background:rgba(79,70,229,.2); }
-    @media (max-width: 480px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } .btn { padding: .4rem .8rem; font-size: .875rem; } }
+    .quick-stats{ display:flex; justify-content:space-around; flex-wrap:wrap; gap:1rem; margin-bottom:1rem; }
+    .stat-card{ flex:1; min-width:150px; text-align:center; padding:1rem; border-radius:.75rem; background:var(--card); }
+    @media (max-width: 480px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } .btn { padding: .4rem .8rem; font-size: .875rem; } .quick-stats { flex-direction:column; } }
   </style>
 </head>
 <body>
   <header class="mb-6 max-w-7xl mx-auto px-4">
     <div class="flex items-center justify-between gap-4">
-      <h1 class="text-2xl font-extrabold">📊 Dashboard ROI – Flotte Auto (v9)</h1>
+      <h1 class="text-2xl font-extrabold">📊 Dashboard ROI – Flotte Auto (v10)</h1>
       <div class="flex flex-wrap items-center gap-2">
         <label class="toggle" title="Basculer thème clair/sombre"><span class="hint">Thème clair</span><input type="checkbox" id="themeToggle"/></label>
         <button id="exportJson" class="btn-ghost">Export JSON</button>
@@ -55,6 +60,7 @@
         <button id="exportPdf" class="btn-ghost">Export PDF</button>
       </div>
     </div>
+    <div id="quickStats" class="quick-stats hidden"></div>
     <div class="mt-4 flex flex-wrap gap-2">
       <button class="btn" onclick="UIManager.showTab('locations')">Locations réelles</button>
       <button class="btn" onclick="UIManager.showTab('vehicles')">Véhicules</button>
@@ -67,15 +73,15 @@
     <section id="locations" class="card hidden">
       <h2 class="text-xl font-semibold mb-3">📅 Locations réelles</h2>
       <div class="grid-4">
-        <div><label>Début *</label><input type="date" id="date" required/></div>
-        <div><label>Jours *</label><input type="number" id="jours" min="1" value="1" required/></div>
-        <div><label>Prix proprio €/jour *</label><input type="number" id="prixJour" min="0.01" step="0.1" value="30" required/></div>
-        <div><label>Véhicule *</label><select id="vehicule" required></select></div>
-        <div><label>Km totaux (optionnel)</label><input type="number" id="kms" min="0" step="1" placeholder="ex. 250"/></div>
-        <div><label>Frais divers (€)</label><input type="number" id="extras" min="0" step="0.1" value="0"/></div>
-        <div><label>Ajustement carburant (+/− €)</label><input type="number" id="fuelAdj" step="0.1" value="0"/></div>
-        <div><label>Net reçu (€) – override</label><input type="number" id="netOverride" step="0.1" placeholder="ex. 82.50"/></div>
-        <div class="md:col-span-2"><label>Notes</label><input type="text" id="notes" placeholder="Ex. #week-end #pro, remise…"/></div>
+        <div><label>Début *</label><input type="date" id="date" required onblur="validateInput(this)"/></div>
+        <div><label>Jours *</label><input type="number" id="jours" min="1" value="1" required onblur="validateInput(this)"/></div>
+        <div><label>Prix proprio €/jour *</label><input type="number" id="prixJour" min="0.01" step="0.1" value="30" required onblur="validateInput(this)"/></div>
+        <div><label>Véhicule *</label><select id="vehicule" required onblur="validateInput(this)"></select></div>
+        <div><label>Km totaux (optionnel)</label><input type="number" id="kms" min="0" step="1" placeholder="ex. 250" onblur="validateInput(this)"/></div>
+        <div><label>Frais divers (€)</label><input type="number" id="extras" min="0" step="0.1" value="0" onblur="validateInput(this)"/></div>
+        <div><label>Ajustement carburant (+/− €)</label><input type="number" id="fuelAdj" step="0.1" value="0" onblur="validateInput(this)"/></div>
+        <div><label>Net reçu (€) – override</label><input type="number" id="netOverride" step="0.1" placeholder="ex. 82.50" onblur="validateInput(this)"/></div>
+        <div class="md:col-span-2"><label>Notes</label><input type="text" id="notes" placeholder="Ex. #week-end #pro, remise…" onblur="validateInput(this)"/></div>
       </div>
       <div class="mt-3 flex flex-wrap gap-2">
         <button id="saveBtn" class="btn" onclick="LocationManager.save()">Enregistrer</button>
@@ -122,9 +128,13 @@
         <p id="roiValue" class="text-2xl" style="color:var(--neg);">—</p>
         <p class="hint">Cumul net / Investissement total</p>
       </div>
-      <div class="grid-2">
+      <div id="priceSuggestion" class="card mb-3 p-2 text-center hidden">
+        <p class="hint">Suggestion prix : <span id="suggText">—</span></p>
+      </div>
+      <div class="grid-3">
         <div><canvas id="chartNet" height="150"></canvas></div>
         <div><canvas id="chartCumul" height="150"></canvas></div>
+        <div><canvas id="chartPredict" height="150"></canvas></div>
       </div>
       <div id="monthTop" class="mt-3 text-sm"></div>
       <div id="monthBreakdown" class="mt-2 grid-2"></div>
@@ -150,10 +160,10 @@
   <div id="toast" class="toast"></div>
 
   <script>
-    // ===== Managers (Modular JS) =====
+    // ===== Managers (Modular JS - v10 avec prédictions & alertes) =====
     class DataManager {
-      static KEY = 'roi_multi_v9_suivi_vnc_percent_table';
-      static UIKEY = 'roi_ui_v9';
+      static KEY = 'roi_multi_v10_suivi_vnc_percent_table';
+      static UIKEY = 'roi_ui_v10';
       static data = JSON.parse(localStorage.getItem(this.KEY) || '{}');
       static ui = JSON.parse(localStorage.getItem(this.UIKEY) || '{"compact":false,"selectedId":null}');
 
@@ -200,7 +210,9 @@
                 ...v.costs,
                 residual: v.costs?.residual ?? 0,
                 useWear: v.costs?.useWear ?? false,
-                acqStart: v.costs?.acqStart ?? ''
+                acqStart: v.costs?.acqStart ?? '',
+                kmActuels: v.costs?.kmActuels ?? 0,
+                maintenanceIntervalKm: v.costs?.maintenanceIntervalKm ?? 15000
               }
             }));
           }
@@ -224,8 +236,23 @@
       }
     }
 
+    function validateInput(el) {
+      const val = el.value.trim();
+      if (el.required && !val) {
+        el.classList.add('error');
+        el.classList.remove('valid');
+      } else if (el.type === 'number' && Number(val) < (el.min || 0)) {
+        el.classList.add('error');
+        el.classList.remove('valid');
+      } else {
+        el.classList.remove('error');
+        el.classList.add('valid');
+      }
+    }
+
     class UIManager {
       static $(id) { return document.getElementById(id); }
+      static currentTab = 'suivi';
 
       static applyTheme() {
         const toggle = this.$('themeToggle');
@@ -237,6 +264,7 @@
       static showTab(id) {
         document.querySelectorAll('section.card').forEach(s => s.classList.add('hidden'));
         this.$(id).classList.remove('hidden');
+        this.currentTab = id;
         if (id === 'suivi') SuiviManager.render();
         if (id === 'vehicles') VehicleManager.render();
         if (id === 'locations') LocationManager.renderTable();
@@ -302,9 +330,13 @@
         const doc = new jsPDF();
         doc.text('Suivi ROI Flotte Auto', 10, 10);
         const rows = window.__lastSuiviRows || [];
+        let body = rows.map(r => [r.m, r.beforeVal.toFixed(2), r.fixesVal.toFixed(2), r.afterVal.toFixed(2), r.margePct.toFixed(0), r.occStr, r.vnc.toFixed(2)]);
+        if (window.predictData) {
+          body = body.map((row, i) => [...row, window.predictData[i] ? window.predictData[i].toFixed(2) : '—']);
+        }
         doc.autoTable({
-          head: [['Mois', 'Net après (€)', 'Marge (%)', 'Occupation', 'VNC (€)']],
-          body: rows.map(r => [r.m, r.afterVal.toFixed(2), r.margePct.toFixed(0) + '%', r.occStr, r.vnc.toFixed(2)])
+          head: window.predictData ? [['Mois', 'Net avant (€)', 'Fixes (€)', 'Net après (€)', 'Marge (%)', 'Occupation', 'VNC (€)', 'Prédiction (€)']] : [['Mois', 'Net avant (€)', 'Fixes (€)', 'Net après (€)', 'Marge (%)', 'Occupation', 'VNC (€)']],
+          body
         });
         doc.save(`suivi-roi-${new Date().toISOString().slice(0,10)}.pdf`);
         DataManager.showToast('Export PDF OK !', 'success');
@@ -317,8 +349,8 @@
 
     class VehicleManager {
       static vehicles = DataManager.data.vehicles || [
-        { id: 'clio', name: 'Clio', active: true, costs: { ass: 56, conn: 25, ent: 45, totalInvested: 11659, residual: 0, amortMonths: 60, useWear: false, acqStart: '' } },
-        { id: 'tesla', name: 'Tesla', active: true, costs: { ass: 115, conn: 0, ent: 30, totalInvested: 0, residual: 0, amortMonths: 60, useWear: false, acqStart: '' } }
+        { id: 'clio', name: 'Clio', active: true, costs: { ass: 56, conn: 25, ent: 45, totalInvested: 11659, residual: 0, amortMonths: 60, useWear: false, acqStart: '', kmActuels: 0, maintenanceIntervalKm: 15000 } },
+        { id: 'tesla', name: 'Tesla', active: true, costs: { ass: 115, conn: 0, ent: 30, totalInvested: 0, residual: 0, amortMonths: 60, useWear: false, acqStart: '', kmActuels: 0, maintenanceIntervalKm: 15000 } }
       ];
 
       static getById(id) { return this.vehicles.find(v => v.id === id); }
@@ -390,6 +422,14 @@
         this.vehicles.forEach(v => {
           const c = v.costs || {};
           const amort = this.monthlyAmort(v);
+          const kmOver = c.kmActuels > c.maintenanceIntervalKm;
+          const monthsSince = c.acqStart ? Calculator.monthDiffInclusive(c.acqStart, new Date().toISOString().slice(0,7)) : 0;
+          const maintOver = monthsSince > 12;
+          const alertClass = (kmOver || maintOver) ? (kmOver && maintOver ? 'alert-bad' : 'alert-warn') : '';
+          const alertText = [];
+          if (kmOver) alertText.push('Km élevé');
+          if (maintOver) alertText.push('Maint. due');
+          const alertBadge = alertText.length ? `<span class="pill ${alertClass}" title="Km: ${c.kmActuels}/${c.maintenanceIntervalKm}. Mois: ${monthsSince}">${alertText.join('+')}</span>` : '<span class="pill" style="background:var(--pos);color:#fff;">OK</span>';
           const card = document.createElement('div');
           card.className = 'card';
           card.innerHTML = `
@@ -409,16 +449,18 @@
               <div><label>Durée amort. (mois)</label><input type="number" value="${c.amortMonths || 60}" class="veh-months" data-id="${v.id}"/></div>
               <div><label>Début amort. (YYYY-MM)</label><input type="month" value="${c.acqStart || ''}" class="veh-acqstart" data-id="${v.id}"/></div>
             </div>
-            <div class="grid-3 mt-2">
+            <div class="grid-4 mt-3">
+              <div><label>Km actuels</label><input type="number" value="${c.kmActuels || 0}" class="veh-km" data-id="${v.id}"/></div>
+              <div><label>Intervalle maint. Km</label><input type="number" value="${c.maintenanceIntervalKm || 15000}" class="veh-maintkm" data-id="${v.id}"/></div>
               <div><label>Base amortissable</label><input type="text" value="${Math.max(0, (c.totalInvested || 0) - (c.residual || 0)).toFixed(2)} €" disabled/></div>
               <div><label>Formule</label><input type="text" value="(Total - Résiduelle) ÷ Mois" disabled/></div>
-              <div><label>Résultat</label><input type="text" value="${amort.toFixed(2)} €/mois" disabled/></div>
             </div>
             <div class="mt-2">
               <label class="toggle">
                 <span class="hint">Usure/km activée (utilise le coût/km global)</span>
                 <input type="checkbox" ${c.useWear ? 'checked' : ''} data-id="${v.id}" class="veh-usewear"/>
               </label>
+              ${alertBadge}
             </div>
             <div class="mt-3 flex gap-2">
               <button class="btn" onclick="VehicleManager.saveAll()">💾 Sauvegarder</button>
@@ -427,7 +469,7 @@
           wrap.appendChild(card);
         });
 
-        // Wire inputs
+        // Wire inputs (ajout veh-km et veh-maintkm)
         wrap.querySelectorAll('.veh-name').forEach(i => i.oninput = e => {
           const v = this.getById(e.target.dataset.id);
           if (v) { v.name = e.target.value; DataManager.saveAll(); this.render(); }
@@ -468,6 +510,14 @@
           const v = this.getById(e.target.dataset.id);
           if (v) { v.costs.useWear = e.target.checked; DataManager.saveAll(); SuiviManager.render(); }
         });
+        wrap.querySelectorAll('.veh-km').forEach(i => i.oninput = e => {
+          const v = this.getById(e.target.dataset.id);
+          if (v) { v.costs.kmActuels = Number(e.target.value || 0); DataManager.saveAll(); this.render(); }
+        });
+        wrap.querySelectorAll('.veh-maintkm').forEach(i => i.oninput = e => {
+          const v = this.getById(e.target.dataset.id);
+          if (v) { v.costs.maintenanceIntervalKm = Number(e.target.value || 15000); DataManager.saveAll(); this.render(); }
+        });
       }
 
       static add() {
@@ -476,7 +526,7 @@
           id,
           name: 'Nouveau véhicule',
           active: true,
-          costs: { ass: 0, conn: 0, ent: 0, totalInvested: 0, residual: 0, amortMonths: 60, useWear: false, acqStart: '' }
+          costs: { ass: 0, conn: 0, ent: 0, totalInvested: 0, residual: 0, amortMonths: 60, useWear: false, acqStart: '', kmActuels: 0, maintenanceIntervalKm: 15000 }
         });
         DataManager.saveAll();
         this.render();
@@ -719,6 +769,17 @@
         return locs[0] ? Calculator.monthKeyFromISO(locs[0].date) : new Date().toISOString().slice(0, 7);
       }
 
+      static simpleLinearRegression(x, y) {
+        const n = x.length;
+        const sumX = x.reduce((a,b)=>a+b,0);
+        const sumY = y.reduce((a,b)=>a+b,0);
+        const sumXY = x.reduce((s,xi,i)=>s + xi*y[i],0);
+        const sumX2 = x.reduce((s,x)=>s + x*x,0);
+        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+        const intercept = (sumY - slope * sumX) / n;
+        return { slope, intercept };
+      }
+
       static buildSuiviRows(months, before, fix, after, daysMap, vehF) {
         const rows = [];
         const active = VehicleManager.vehicles.filter(v => v.active);
@@ -803,7 +864,7 @@
           });
         });
 
-        const months = Object.keys(monthsNetMap).sort();
+        let months = Object.keys(monthsNetMap).sort();
         let monthlyBefore = [], monthlyFix = [], monthlyAfter = [];
         if (vehF === 'ALL') {
           monthlyBefore = months.map(m => monthsNetMap[m] || 0);
@@ -815,14 +876,59 @@
         }
         monthlyAfter = monthlyBefore.map((v, i) => v - monthlyFix[i]);
 
+        // Prédiction ROI (régression linéaire simple)
+        let predictData = [];
+        if (months.length > 1) {
+          const pastX = months.map((_, i) => i + 1);
+          const pastY = monthlyAfter;
+          const { slope, intercept } = this.simpleLinearRegression(pastX, pastY);
+          const futureMonths = 6;
+          for (let i = months.length + 1; i <= months.length + futureMonths; i++) {
+            const pred = slope * i + intercept;
+            predictData.push(pred);
+            const lastDate = new Date(months[months.length - 1] + '-01');
+            lastDate.setMonth(lastDate.getMonth() + (i - months.length));
+            months.push(lastDate.toISOString().slice(0, 7));
+          }
+          monthlyAfter = [...monthlyAfter, ...predictData];
+          window.predictData = predictData;
+        }
+
         // ROI Global
-        const totalNet = monthlyAfter.reduce((a, b) => a + b, 0);
+        const totalNet = monthlyAfter.slice(0, -6).reduce((a, b) => a + b, 0); // Sans prédictions
         const totalInvest = active.reduce((s, v) => s + (v.costs.totalInvested || 0), 0);
         const roi = totalInvest > 0 ? (totalNet / totalInvest * 100) : 0;
         UIManager.$('roiValue').textContent = `${roi.toFixed(1)}%`;
         UIManager.$('roiValue').style.color = roi >= 10 ? 'var(--pos)' : roi >= 0 ? 'var(--warn)' : 'var(--neg)';
 
-        const currentM = mSel || months[months.length - 1];
+        // Suggestion prix
+        const avgOcc = rows.reduce((s, r) => s + parseFloat(r.occStr.match(/(\d+)%/)?.[1] || 0), 0) / rows.length;
+        const suggEl = UIManager.$('priceSuggestion');
+        const suggText = UIManager.$('suggText');
+        if (avgOcc > 70) {
+          suggText.textContent = '+15% (haute occ.)';
+          suggEl.classList.remove('hidden');
+        } else if (avgOcc < 30) {
+          suggText.textContent = '-10% (basse occ.)';
+          suggEl.classList.remove('hidden');
+        } else {
+          suggEl.classList.add('hidden');
+        }
+
+        // Quick Stats
+        if (UIManager.currentTab === 'suivi') {
+          const stats = UIManager.$('quickStats');
+          stats.innerHTML = `
+            <div class="stat-card"><div class="text-2xl font-bold" style="color:var(--pos)">${totalNet.toFixed(0)}€</div><div class="hint">Net Total</div></div>
+            <div class="stat-card"><div class="text-2xl font-bold" style="color:var(--warn)">${avgOcc.toFixed(0)}%</div><div class="hint">Occ. Moy.</div></div>
+            <div class="stat-card"><div class="text-2xl font-bold" style="color:var(--primary)">${active.length}</div><div class="hint">Véh. Actifs</div></div>
+          `;
+          stats.classList.remove('hidden');
+        } else {
+          UIManager.$('quickStats').classList.add('hidden');
+        }
+
+        const currentM = mSel || months[months.length - 7]; // Avant prédictions
         const top = UIManager.$('monthTop'), bd = UIManager.$('monthBreakdown');
         if (currentM) {
           const before = monthsNetMap[currentM] || 0;
@@ -866,7 +972,7 @@
         }
 
         // Table + CSV
-        const rows = this.buildSuiviRows(months, monthlyBefore, monthlyFix, monthlyAfter, monthsDaysMap, vehF);
+        const rows = this.buildSuiviRows(months.slice(0, -6), monthlyBefore.slice(0, -6), monthlyFix.slice(0, -6), monthlyAfter.slice(0, -6), monthsDaysMap, vehF);
         window.__lastSuiviRows = rows;
         this.renderSuiviTable(rows);
 
@@ -876,13 +982,13 @@
         if (chartCumul) chartCumul.destroy();
         const percentMode = UIManager.$('modePercent')?.checked;
         const barsData = percentMode
-          ? monthlyAfter.map((v, i) => (monthlyBefore[i] > 0 ? (v / monthlyBefore[i] * 100) : 0))
-          : monthlyAfter;
+          ? monthlyAfter.slice(0, -6).map((v, i) => (monthlyBefore[i] > 0 ? (v / monthlyBefore[i] * 100) : 0))
+          : monthlyAfter.slice(0, -6);
         const barLabel = percentMode ? 'Marge (%)' : 'Net après frais fixes (€)';
         const refFixDataset = !percentMode ? {
           type: 'line',
           label: 'Fixes (€)',
-          data: monthlyFix,
+          data: monthlyFix.slice(0, -6),
           borderWidth: 1.5,
           borderColor: 'rgba(148,163,184,.9)',
           pointRadius: 2,
@@ -902,7 +1008,7 @@
 
         window.chartNet = new Chart(UIManager.$('chartNet').getContext('2d'), {
           type: 'bar',
-          data: { labels: months, datasets },
+          data: { labels: months.slice(0, -6), datasets },
           options: {
             plugins: {
               legend: { display: true },
@@ -926,12 +1032,36 @@
         });
 
         const cum = []; let acc = 0;
-        for (const v of monthlyAfter) { acc += v; cum.push(acc); }
+        for (const v of monthlyAfter.slice(0, -6)) { acc += v; cum.push(acc); }
         window.chartCumul = new Chart(UIManager.$('chartCumul').getContext('2d'), {
           type: 'line',
-          data: { labels: months, datasets: [{ label: 'Cumul (€)', data: cum, fill: false, borderColor: 'rgba(79,70,229,.95)', tension: .25, pointRadius: 3 }] },
+          data: { labels: months.slice(0, -6), datasets: [{ label: 'Cumul (€)', data: cum, fill: false, borderColor: 'rgba(79,70,229,.95)', tension: .25, pointRadius: 3 }] },
           options: { plugins: { legend: { display: false } } }
         });
+
+        // Chart Prédiction
+        if (predictData.length) {
+          const futureLabels = months.slice(-6);
+          window.chartPredict = new Chart(UIManager.$('chartPredict').getContext('2d'), {
+            type: 'line',
+            data: {
+              labels: futureLabels,
+              datasets: [{
+                label: 'Prédiction Net (€)',
+                data: predictData,
+                borderColor: 'rgba(34,197,94,.8)',
+                backgroundColor: 'rgba(34,197,94,.1)',
+                tension: 0.3,
+                pointRadius: 0,
+                fill: true
+              }]
+            },
+            options: {
+              plugins: { legend: { display: true } },
+              scales: { y: { beginAtZero: true } }
+            }
+          });
+        }
       }
     }
 
@@ -1091,7 +1221,7 @@
         id: 'clio',
         name: 'Clio',
         active: true,
-        costs: { ass: 56, conn: 25, ent: 45, totalInvested: 11659, residual: 0, amortMonths: 60, useWear: false, acqStart: '' }
+        costs: { ass: 56, conn: 25, ent: 45, totalInvested: 11659, residual: 0, amortMonths: 60, useWear: false, acqStart: '', kmActuels: 0, maintenanceIntervalKm: 15000 }
       });
     }
     if (!VehicleManager.vehicles.find(v => v.id === 'tesla')) {
@@ -1099,7 +1229,7 @@
         id: 'tesla',
         name: 'Tesla',
         active: true,
-        costs: { ass: 115, conn: 0, ent: 30, totalInvested: 0, residual: 0, amortMonths: 60, useWear: false, acqStart: '' }
+        costs: { ass: 115, conn: 0, ent: 30, totalInvested: 0, residual: 0, amortMonths: 60, useWear: false, acqStart: '', kmActuels: 0, maintenanceIntervalKm: 15000 }
       });
     }
     UIManager.applyTheme();
