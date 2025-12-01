@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard ROI - Flotte Auto (v9)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.32/jspdf.plugin.autotable.min.js"></script>
+  <style>
+    :root { --bg1:#0b0d10; --bg2:#111418; --card:rgba(22,26,32,.72); --text:#e7e9ee; --muted:#a4acb9; --border:rgba(255,255,255,.08); --ring:#7dd3fc; --primary:#4f46e5; --primary-d:#4338ca; --pos:#16a34a; --neg:#ef4444; --warn:#f59e0b; }
+    .light{ --bg1:#f7f8fb; --bg2:#eef1f6; --card:rgba(255,255,255,.9); --text:#0f172a; --muted:#5b6576; --border:rgba(15,15,30,.12); --ring:#0ea5e9; --primary:#2563eb; --primary-d:#1e40af; --pos:#16a34a; --neg:#ef4444; --warn:#f59e0b; }
+    body{ min-height:100vh; background: radial-gradient(1000px 600px at 15% -10%, rgba(79,70,229,.14), transparent 60%), radial-gradient(900px 560px at 100% 10%, rgba(14,165,233,.12), transparent 55%), linear-gradient(180deg,var(--bg1),var(--bg2)); color:var(--text); -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+    .card{ background:var(--card); border:1px solid var(--border); border-radius:1rem; padding:1.1rem; backdrop-filter: blur(8px); }
+    .btn{ background:linear-gradient(180deg,var(--primary),var(--primary-d)); color:#fff; padding:.55rem .95rem; border-radius:.7rem; font-weight:700; }
+    .btn-ghost{ background:transparent; border:1px solid var(--border); border-radius:.7rem; padding:.5rem .8rem; color:var(--text); }
+    input,select{ background:rgba(255,255,255,.03); color:var(--text); border:1px solid var(--border); border-radius:.6rem; padding:.55rem .65rem; width:100%; transition:border-color .2s; }
+    input.error{ border-color:var(--neg); box-shadow:0 0 0 2px rgba(239,68,68,.2); }
+    label{ color:var(--muted); font-size:.9rem; }
+    table{ width:100%; border-collapse:collapse; } th,td{ border-bottom:1px solid var(--border); padding:.55rem .6rem; } th{ color:var(--muted); text-align:left; }
+    .pill{ font-size:.75rem; font-weight:800; padding:.2rem .55rem; border-radius:999px; }
+    .grid-2{ display:grid; grid-template-columns:repeat(1,minmax(0,1fr)); gap:1rem; }
+    .grid-3{ display:grid; grid-template-columns:repeat(1,minmax(0,1fr)); gap:1rem; }
+    .grid-4{ display:grid; grid-template-columns:repeat(1,minmax(0,1fr)); gap:1rem; }
+    @media(min-width:768px){ .grid-2{ grid-template-columns:repeat(2,1fr); } .grid-3{ grid-template-columns:repeat(3,1fr); } .grid-4{ grid-template-columns:repeat(4,1fr); } }
+    .toggle{ display:flex; align-items:center; gap:.5rem; cursor:pointer; }
+    .toggle input{ width:2.6rem; height:1.35rem; appearance:none; border:1px solid var(--border); border-radius:999px; position:relative; background:rgba(255,255,255,.08); }
+    .toggle input:checked{ background:linear-gradient(180deg,var(--primary),var(--primary-d)); }
+    .toggle input:before{ content:""; position:absolute; top:2px; left:2px; width:1.05rem; height:1.05rem; background:#fff; border-radius:999px; transition:all .18s ease; }
+    .toggle input:checked:before{ transform:translateX(1.2rem); }
+    .hint{ color:var(--muted); font-size:.85rem; }
+    .row-selected{ outline:2px solid var(--ring); background:rgba(125,211,252,.08); }
+    .compact table th, .compact table td{ padding:.25rem .35rem; }
+    .compact .pill{ font-size:.7rem; padding:.15rem .4rem; }
+    .toast{ position:fixed; top:20px; right:20px; padding:1rem 1.5rem; border-radius:.5rem; color:#fff; z-index:1000; transform:translateX(100%); transition:transform .3s; font-weight:500; }
+    .toast.show{ transform:translateX(0); }
+    .occ-badge{ padding:.2rem .5rem; border-radius:.5rem; font-size:.8rem; font-weight:600; }
+    .occ-good{ background:var(--pos); color:#fff; }
+    .occ-warn{ background:var(--warn); color:#fff; }
+    .occ-bad{ background:var(--neg); color:#fff; }
+    .highlight{ background:rgba(79,70,229,.2); }
+    @media (max-width: 480px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } .btn { padding: .4rem .8rem; font-size: .875rem; } }
+  </style>
+</head>
+<body>
+  <header class="mb-6 max-w-7xl mx-auto px-4">
+    <div class="flex items-center justify-between gap-4">
+      <h1 class="text-2xl font-extrabold">📊 Dashboard ROI – Flotte Auto (v9)</h1>
+      <div class="flex flex-wrap items-center gap-2">
+        <label class="toggle" title="Basculer thème clair/sombre"><span class="hint">Thème clair</span><input type="checkbox" id="themeToggle"/></label>
+        <button id="exportJson" class="btn-ghost">Export JSON</button>
+        <label class="btn-ghost cursor-pointer">Import JSON<input id="importJson" type="file" accept="application/json" class="hidden"/></label>
+        <button id="exportCsv" class="btn-ghost">Export CSV</button>
+        <button id="exportPdf" class="btn-ghost">Export PDF</button>
+      </div>
+    </div>
+    <div class="mt-4 flex flex-wrap gap-2">
+      <button class="btn" onclick="UIManager.showTab('locations')">Locations réelles</button>
+      <button class="btn" onclick="UIManager.showTab('vehicles')">Véhicules</button>
+      <button class="btn" onclick="UIManager.showTab('suivi')">Suivi mensuel</button>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 space-y-6">
+    <!-- LOCATIONS -->
+    <section id="locations" class="card hidden">
+      <h2 class="text-xl font-semibold mb-3">📅 Locations réelles</h2>
+      <div class="grid-4">
+        <div><label>Début *</label><input type="date" id="date" required/></div>
+        <div><label>Jours *</label><input type="number" id="jours" min="1" value="1" required/></div>
+        <div><label>Prix proprio €/jour *</label><input type="number" id="prixJour" min="0.01" step="0.1" value="30" required/></div>
+        <div><label>Véhicule *</label><select id="vehicule" required></select></div>
+        <div><label>Km totaux (optionnel)</label><input type="number" id="kms" min="0" step="1" placeholder="ex. 250"/></div>
+        <div><label>Frais divers (€)</label><input type="number" id="extras" min="0" step="0.1" value="0"/></div>
+        <div><label>Ajustement carburant (+/− €)</label><input type="number" id="fuelAdj" step="0.1" value="0"/></div>
+        <div><label>Net reçu (€) – override</label><input type="number" id="netOverride" step="0.1" placeholder="ex. 82.50"/></div>
+        <div class="md:col-span-2"><label>Notes</label><input type="text" id="notes" placeholder="Ex. #week-end #pro, remise…"/></div>
+      </div>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button id="saveBtn" class="btn" onclick="LocationManager.save()">Enregistrer</button>
+        <button id="cancelEditBtn" class="btn-ghost hidden" onclick="LocationManager.cancelEdit()">Annuler</button>
+        <select id="filterVehicule" class="w-auto"></select>
+        <input type="month" id="filterMonth" class="w-auto"/>
+        <input type="text" id="filterNotes" class="w-auto" placeholder="#tag, notes, texte" style="min-width:180px"/>
+        <label class="toggle" title="Mode compact du tableau"><span class="hint">Compact</span><input type="checkbox" id="compactToggle"/></label>
+        <button class="btn-ghost" onclick="UIManager.clearFilters()">Effacer filtres</button>
+      </div>
+      <div class="mt-4 overflow-x-auto">
+        <table>
+          <thead><tr><th>Date</th><th>Jours</th><th>€/j</th><th>Km</th><th>Frais</th><th>Carburant ±</th><th>Véhicule</th><th>Net loc</th><th>Notes</th><th>Actions</th></tr></thead>
+          <tbody id="locTable"></tbody>
+        </table>
+      </div>
+      <p class="text-sm mt-2 hint">Le net affiché suit la logique : <i>(prix × jours × (1–commission)) − usure − frais + carburant</i>. <b>Si “Net reçu” est saisi, il remplace ce calcul partout.</b></p>
+    </section>
+
+    <!-- VEHICLES -->
+    <section id="vehicles" class="card hidden">
+      <h2 class="text-xl font-semibold mb-3">🚗 Véhicules</h2>
+      <div class="mb-3 flex flex-wrap gap-2">
+        <button class="btn" onclick="VehicleManager.add()">+ Ajouter un véhicule</button>
+      </div>
+      <div id="vehiclesList" class="grid-2"></div>
+    </section>
+
+    <!-- SUIVI -->
+    <section id="suivi" class="card hidden">
+      <h2 class="text-xl font-semibold mb-1">📊 Suivi mensuel</h2>
+      <p class="hint mb-3">Astuce : choisis un véhicule pour voir <b>uniquement</b> ses résultats. “Tous véhicules” additionne tout (net ventilé <b>jour par jour</b>). Badge d’occupation = jours loués / capacité.</p>
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <select id="suiviVehicule" class="w-auto"></select>
+        <input type="month" id="suiviMonth" class="w-auto" />
+        <label class="toggle" title="Afficher la marge (%) au lieu des €">
+          <span class="hint">Mode %</span>
+          <input type="checkbox" id="modePercent"/>
+        </label>
+        <button id="exportSuiviCsv" class="btn-ghost">Export Suivi (CSV)</button>
+      </div>
+      <div id="globalROI" class="card mb-3 p-4 text-center">
+        <h3 class="text-lg font-bold">ROI Global</h3>
+        <p id="roiValue" class="text-2xl" style="color:var(--neg);">—</p>
+        <p class="hint">Cumul net / Investissement total</p>
+      </div>
+      <div class="grid-2">
+        <div><canvas id="chartNet" height="150"></canvas></div>
+        <div><canvas id="chartCumul" height="150"></canvas></div>
+      </div>
+      <div id="monthTop" class="mt-3 text-sm"></div>
+      <div id="monthBreakdown" class="mt-2 grid-2"></div>
+      <div class="mt-4 overflow-x-auto">
+        <table>
+          <thead>
+            <tr>
+              <th>Mois</th>
+              <th>Net avant fixes (€)</th>
+              <th>Fixes (€)</th>
+              <th>Net après (€)</th>
+              <th>Marge (%)</th>
+              <th>Occupation</th>
+              <th>VNC (€)</th>
+            </tr>
+          </thead>
+          <tbody id="suiviTable"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    // ===== Managers (Modular JS) =====
+    class DataManager {
+      static KEY = 'roi_multi_v9_suivi_vnc_percent_table';
+      static UIKEY = 'roi_ui_v9';
+      static data = JSON.parse(localStorage.getItem(this.KEY) || '{}');
+      static ui = JSON.parse(localStorage.getItem(this.UIKEY) || '{"compact":false,"selectedId":null}');
+
+      static get theme() { return this.data.theme || 'dark'; }
+      static set theme(val) { this.data.theme = val; this.saveAll(); }
+
+      static saveAll() {
+        localStorage.setItem(this.KEY, JSON.stringify({theme: this.theme, vehicles: VehicleManager.vehicles, globals: GlobalManager.globals, locations: LocationManager.locations}));
+        localStorage.setItem(this.UIKEY, JSON.stringify(this.ui));
+      }
+
+      static validateLocation(obj) {
+        const errors = [];
+        if (!obj.date) errors.push('Date requise');
+        if (obj.jours < 1) errors.push('Jours ≥1');
+        if (obj.prixJour <= 0) errors.push('Prix >0');
+        if (!obj.vehiculeId || !VehicleManager.getById(obj.vehiculeId)) errors.push('Véhicule requis');
+        return errors;
+      }
+
+      static showToast(msg, type = 'info') {
+        const toast = document.getElementById('toast');
+        toast.textContent = msg;
+        toast.style.background = type === 'error' ? 'var(--neg)' : type === 'success' ? 'var(--pos)' : 'var(--primary)';
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 3000);
+      }
+
+      static autoBackup() {
+        setInterval(() => {
+          if (confirm('Sauvegarde auto détectée. Exporter maintenant ?')) {
+            UIManager.exportJson();
+          }
+        }, 300000); // 5min
+      }
+
+      static importData(imported) {
+        try {
+          if (imported.theme) this.theme = imported.theme;
+          if (Array.isArray(imported.vehicles)) {
+            VehicleManager.vehicles = imported.vehicles.map(v => ({
+              ...v,
+              costs: {
+                ...v.costs,
+                residual: v.costs?.residual ?? 0,
+                useWear: v.costs?.useWear ?? false,
+                acqStart: v.costs?.acqStart ?? ''
+              }
+            }));
+          }
+          if (imported.globals) GlobalManager.globals = imported.globals;
+          if (Array.isArray(imported.locations)) {
+            LocationManager.locations = imported.locations.map(l => ({
+              ...l,
+              netOverride: (l.netOverride !== undefined ? l.netOverride : (l.net_recu !== undefined ? l.net_recu : null))
+            }));
+          }
+          this.saveAll();
+          VehicleManager.render();
+          LocationManager.fillVehSelect();
+          UIManager.fillFilters();
+          LocationManager.renderTable();
+          SuiviManager.render();
+          DataManager.showToast('Import réussi ✅', 'success');
+        } catch (e) {
+          DataManager.showToast('Fichier invalide ❌', 'error');
+        }
+      }
+    }
+
+    class UIManager {
+      static $(id) { return document.getElementById(id); }
+
+      static applyTheme() {
+        const toggle = this.$('themeToggle');
+        if (!toggle.checked && DataManager.theme === 'light') toggle.checked = true;
+        toggle.checked ? document.documentElement.classList.add('light') : document.documentElement.classList.remove('light');
+        document.body.classList.toggle('compact', !!DataManager.ui.compact);
+      }
+
+      static showTab(id) {
+        document.querySelectorAll('section.card').forEach(s => s.classList.add('hidden'));
+        this.$(id).classList.remove('hidden');
+        if (id === 'suivi') SuiviManager.render();
+        if (id === 'vehicles') VehicleManager.render();
+        if (id === 'locations') LocationManager.renderTable();
+      }
+
+      static clearFilters() {
+        this.$('filterVehicule').value = 'ALL';
+        this.$('filterMonth').value = '';
+        this.$('filterNotes').value = '';
+        LocationManager.renderTable();
+      }
+
+      static fillFilters() {
+        const filt = this.$('filterVehicule');
+        filt.innerHTML = '';
+        const optAll = document.createElement('option');
+        optAll.value = 'ALL';
+        optAll.textContent = 'Tous véhicules';
+        filt.appendChild(optAll);
+        VehicleManager.vehicles.filter(v => v.active).forEach(v => {
+          const o = document.createElement('option');
+          o.value = v.id;
+          o.textContent = v.name;
+          filt.appendChild(o);
+        });
+      }
+
+      static exportJson() {
+        const blob = new Blob([JSON.stringify(DataManager.data, null, 2)], {type: 'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `roi-data-${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 0);
+        DataManager.showToast('Export JSON OK !', 'success');
+      }
+
+      static exportCsv() {
+        const headers = ['Date', 'Jours', 'Prix/j', 'Km', 'Frais', 'Carburant ±', 'Véhicule', 'Net loc', 'Notes'];
+        const rows = LocationManager.locations.map(l => [
+          l.date,
+          l.jours,
+          l.prixJour.toFixed(2),
+          l.kms || '',
+          l.extras.toFixed(2),
+          l.fuelAdj.toFixed(2),
+          VehicleManager.getById(l.vehiculeId)?.name || '',
+          Calculator.netLocation(l).toFixed(2),
+          l.notes || ''
+        ]);
+        const csv = [headers.join(';'), ...rows.map(row => row.join(';'))].join('\n');
+        const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `locations-${new Date().toISOString().slice(0,10)}.csv`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 0);
+        DataManager.showToast('Export CSV OK !', 'success');
+      }
+
+      static exportPdf() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.text('Suivi ROI Flotte Auto', 10, 10);
+        const rows = window.__lastSuiviRows || [];
+        doc.autoTable({
+          head: [['Mois', 'Net après (€)', 'Marge (%)', 'Occupation', 'VNC (€)']],
+          body: rows.map(r => [r.m, r.afterVal.toFixed(2), r.margePct.toFixed(0) + '%', r.occStr, r.vnc.toFixed(2)])
+        });
+        doc.save(`suivi-roi-${new Date().toISOString().slice(0,10)}.pdf`);
+        DataManager.showToast('Export PDF OK !', 'success');
+      }
+    }
+
+    class GlobalManager {
+      static globals = DataManager.data.globals || { commission: 10, wearPerKm: 0.12, kmInclus: 100 };
+    }
+
+    class VehicleManager {
+      static vehicles = DataManager.data.vehicles || [
+        { id: 'clio', name: 'Clio', active: true, costs: { ass: 56, conn: 25, ent: 45, totalInvested: 11659, residual: 0, amortMonths: 60, useWear: false, acqStart: '' } },
+        { id: 'tesla', name: 'Tesla', active: true, costs: { ass: 115, conn: 0, ent: 30, totalInvested: 0, residual: 0, amortMonths: 60, useWear: false, acqStart: '' } }
+      ];
+
+      static getById(id) { return this.vehicles.find(v => v.id === id); }
+
+      static monthlyAmort(v) {
+        const c = v.costs || {};
+        const months = Math.max(1, Number(c.amortMonths || 0));
+        let base = Number(c.totalInvested || 0) - Number(c.residual || 0);
+        if (base < 0) base = 0;
+        return base / months;
+      }
+
+      static fixedCostsMonthly(v) {
+        const c = v.costs || {};
+        return (c.ass || 0) + (c.conn || 0) + (c.ent || 0) + this.monthlyAmort(v);
+      }
+
+      static fixedCostsBreakdown(v) {
+        const c = v.costs || {};
+        return {
+          ass: c.ass || 0,
+          conn: c.conn || 0,
+          ent: c.ent || 0,
+          amort: this.monthlyAmort(v),
+          base: Math.max(0, (c.totalInvested || 0) - (c.residual || 0)),
+          months: Math.max(1, Number(c.amortMonths || 0))
+        };
+      }
+
+      static vncForVehicleAtMonth(v, monthKeyStr) {
+        const c = v.costs || {};
+        const amort = this.monthlyAmort(v);
+        const base = Math.max(0, (c.totalInvested || 0) - (c.residual || 0));
+        const start = c.acqStart || SuiviManager.firstActivityMonthForVeh(v.id) || monthKeyStr;
+        const elapsed = Math.max(0, Calculator.monthDiffInclusive(start, monthKeyStr) - 1);
+        const depreciated = Math.min(base, amort * elapsed);
+        const vnc = (c.totalInvested || 0) - depreciated;
+        return Math.max(vnc, c.residual || 0);
+      }
+
+      static render() {
+        const active = this.vehicles.filter(v => v.active);
+        ['vehicule', 'filterVehicule', 'suiviVehicule'].forEach(id => {
+          const el = UIManager.$(id);
+          if (!el) return;
+          el.innerHTML = '';
+          if (id === 'filterVehicule' || id === 'suiviVehicule') {
+            const optAll = document.createElement('option');
+            optAll.value = 'ALL';
+            optAll.textContent = 'Tous véhicules';
+            el.appendChild(optAll);
+          }
+          active.forEach(v => {
+            const o = document.createElement('option');
+            o.value = v.id;
+            o.textContent = v.name;
+            el.appendChild(o);
+          });
+        });
+        const sel = UIManager.$('suiviVehicule');
+        const firstActive = this.vehicles.find(v => v.active);
+        if (firstActive && (!sel.dataset.setOnce || sel.value === 'ALL')) {
+          sel.value = firstActive.id;
+          sel.dataset.setOnce = '1';
+        }
+
+        const wrap = UIManager.$('vehiclesList');
+        wrap.innerHTML = '';
+        this.vehicles.forEach(v => {
+          const c = v.costs || {};
+          const amort = this.monthlyAmort(v);
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.innerHTML = `
+            <div class="flex items-center justify-between">
+              <input value="${v.name}" data-id="${v.id}" class="veh-name" style="max-width:240px"/>
+              <label class="toggle"><span class="hint">Actif</span><input type="checkbox" ${v.active ? 'checked' : ''} data-id="${v.id}" class="veh-active"/></label>
+            </div>
+            <div class="grid-4 mt-3">
+              <div><label>Assurance / mois</label><input type="number" step="0.1" value="${c.ass || 0}" class="veh-ass" data-id="${v.id}"/></div>
+              <div><label>Connect / mois</label><input type="number" step="0.1" value="${c.conn || 0}" class="veh-conn" data-id="${v.id}"/></div>
+              <div><label>Entretien / mois</label><input type="number" step="0.1" value="${c.ent || 0}" class="veh-ent" data-id="${v.id}"/></div>
+              <div><label>Amort. (auto) / mois</label><input type="number" value="${amort.toFixed(2)}" disabled/></div>
+            </div>
+            <div class="grid-4 mt-3">
+              <div><label>Total investi (€)</label><input type="number" step="0.1" value="${c.totalInvested || 0}" class="veh-total" data-id="${v.id}"/></div>
+              <div><label>Valeur résiduelle estimée (€)</label><input type="number" step="0.1" value="${c.residual || 0}" class="veh-resid" data-id="${v.id}"/></div>
+              <div><label>Durée amort. (mois)</label><input type="number" value="${c.amortMonths || 60}" class="veh-months" data-id="${v.id}"/></div>
+              <div><label>Début amort. (YYYY-MM)</label><input type="month" value="${c.acqStart || ''}" class="veh-acqstart" data-id="${v.id}"/></div>
+            </div>
+            <div class="grid-3 mt-2">
+              <div><label>Base amortissable</label><input type="text" value="${Math.max(0, (c.totalInvested || 0) - (c.residual || 0)).toFixed(2)} €" disabled/></div>
+              <div><label>Formule</label><input type="text" value="(Total - Résiduelle) ÷ Mois" disabled/></div>
+              <div><label>Résultat</label><input type="text" value="${amort.toFixed(2)} €/mois" disabled/></div>
+            </div>
+            <div class="mt-2">
+              <label class="toggle">
+                <span class="hint">Usure/km activée (utilise le coût/km global)</span>
+                <input type="checkbox" ${c.useWear ? 'checked' : ''} data-id="${v.id}" class="veh-usewear"/>
+              </label>
+            </div>
+            <div class="mt-3 flex gap-2">
+              <button class="btn" onclick="VehicleManager.saveAll()">💾 Sauvegarder</button>
+              <button class="btn-ghost" onclick="VehicleManager.remove('${v.id}')">Supprimer</button>
+            </div>`;
+          wrap.appendChild(card);
+        });
+
+        // Wire inputs
+        wrap.querySelectorAll('.veh-name').forEach(i => i.oninput = e => {
+          const v = this.getById(e.target.dataset.id);
+          if (v) { v.name = e.target.value; DataManager.saveAll(); this.render(); }
+        });
+        wrap.querySelectorAll('.veh-active').forEach(i => i.onchange = e => {
+          const v = this.getById(e.target.dataset.id);
+          if (v) { v.active = e.target.checked; DataManager.saveAll(); this.render(); SuiviManager.render(); }
+        });
+        wrap.querySelectorAll('.veh-ass').forEach(i => i.oninput = e => {
+          const v = this.getById(e.target.dataset.id);
+          if (v) { v.costs.ass = Number(e.target.value || 0); DataManager.saveAll(); }
+        });
+        wrap.querySelectorAll('.veh-conn').forEach(i => i.oninput = e => {
+          const v = this.getById(e.target.dataset.id);
+          if (v) { v.costs.conn = Number(e.target.value || 0); DataManager.saveAll(); }
+        });
+        wrap.querySelectorAll('.veh-ent').forEach(i => i.oninput = e => {
+          const v = this.getById(e.target.dataset.id);
+          if (v) { v.costs.ent = Number(e.target.value || 0); DataManager.saveAll(); }
+        });
+        wrap.querySelectorAll('.veh-total').forEach(i => i.oninput = e => {
+          const v = this.getById(e.target.dataset.id);
+          if (v) { v.costs.totalInvested = Number(e.target.value || 0); DataManager.saveAll(); this.render(); SuiviManager.render(); }
+        });
+        wrap.querySelectorAll('.veh-resid').forEach(i => i.oninput = e => {
+          const v = this.getById(e.target.dataset.id);
+          if (v) { v.costs.residual = Number(e.target.value || 0); DataManager.saveAll(); this.render(); SuiviManager.render(); }
+        });
+        wrap.querySelectorAll('.veh-months').forEach(i => i.oninput = e => {
+          const v = this.getById(e.target.dataset.id);
+          if (v) { v.costs.amortMonths = Math.max(1, Number(e.target.value || 1)); DataManager.saveAll(); this.render(); SuiviManager.render(); }
+        });
+        wrap.querySelectorAll('.veh-acqstart').forEach(i => i.oninput = e => {
+          const v = this.getById(e.target.dataset.id);
+          if (v) { v.costs.acqStart = e.target.value || ''; DataManager.saveAll(); SuiviManager.render(); }
+        });
+        wrap.querySelectorAll('.veh-usewear').forEach(i => i.onchange = e => {
+          const v = this.getById(e.target.dataset.id);
+          if (v) { v.costs.useWear = e.target.checked; DataManager.saveAll(); SuiviManager.render(); }
+        });
+      }
+
+      static add() {
+        const id = 'veh_' + Math.random().toString(36).slice(2, 8);
+        this.vehicles.push({
+          id,
+          name: 'Nouveau véhicule',
+          active: true,
+          costs: { ass: 0, conn: 0, ent: 0, totalInvested: 0, residual: 0, amortMonths: 60, useWear: false, acqStart: '' }
+        });
+        DataManager.saveAll();
+        this.render();
+        LocationManager.renderTable();
+        SuiviManager.render();
+      }
+
+      static remove(id) {
+        if (!confirm('Supprimer ce véhicule ?')) return;
+        this.vehicles = this.vehicles.filter(v => v.id !== id);
+        LocationManager.locations = LocationManager.locations.filter(l => l.vehiculeId !== id);
+        DataManager.saveAll();
+        this.render();
+        LocationManager.renderTable();
+        SuiviManager.render();
+      }
+
+      static saveAll() {
+        DataManager.saveAll();
+        DataManager.showToast('Véhicules sauvegardés ✅', 'success');
+      }
+    }
+
+    class LocationManager {
+      static locations = (DataManager.data.locations || []).map(l => ({
+        ...l,
+        netOverride: (l.netOverride !== undefined ? l.netOverride : (l.net_recu !== undefined ? l.net_recu : null))
+      }));
+      static editId = null;
+
+      static save() {
+        const inputs = {
+          date: UIManager.$('date').value,
+          jours: Number(UIManager.$('jours').value || 1),
+          prixJour: Number(UIManager.$('prixJour').value || 0),
+          kms: UIManager.$('kms').value ? Number(UIManager.$('kms').value) : 0,
+          extras: Number(UIManager.$('extras').value || 0),
+          fuelAdj: Number(UIManager.$('fuelAdj').value || 0),
+          notes: UIManager.$('notes').value || '',
+          vehiculeId: UIManager.$('vehicule').value,
+          netOverride: UIManager.$('netOverride').value !== '' ? Number(UIManager.$('netOverride').value) : null
+        };
+        const errors = DataManager.validateLocation(inputs);
+        if (errors.length) {
+          errors.forEach(e => DataManager.showToast(e, 'error'));
+          return;
+        }
+        if (this.editId) {
+          this.locations = this.locations.map(l => l.id === this.editId ? { ...l, ...inputs } : l);
+          this.editId = null;
+          UIManager.$('cancelEditBtn').classList.add('hidden');
+          UIManager.$('saveBtn').textContent = 'Enregistrer';
+        } else {
+          const id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())) + Math.random().toString(36).slice(2, 6);
+          this.locations.push({ id, ...inputs });
+        }
+        DataManager.saveAll();
+        this.clearForm();
+        this.renderTable();
+        SuiviManager.render();
+        DataManager.showToast('Location sauvegardée !', 'success');
+      }
+
+      static cancelEdit() {
+        this.editId = null;
+        this.clearForm();
+        UIManager.$('cancelEditBtn').classList.add('hidden');
+        UIManager.$('saveBtn').textContent = 'Enregistrer';
+      }
+
+      static clearForm() {
+        UIManager.$('date').value = '';
+        UIManager.$('jours').value = 1;
+        UIManager.$('prixJour').value = 30;
+        UIManager.$('kms').value = '';
+        UIManager.$('extras').value = '0';
+        UIManager.$('fuelAdj').value = '0';
+        UIManager.$('netOverride').value = '';
+        UIManager.$('notes').value = '';
+        UIManager.$('vehicule').value = '';
+      }
+
+      static remove(id) {
+        this.locations = this.locations.filter(l => l.id !== id);
+        DataManager.saveAll();
+        this.renderTable();
+        SuiviManager.render();
+      }
+
+      static edit(id) {
+        const l = this.locations.find(x => x.id === id);
+        if (!l) return;
+        this.editId = id;
+        UIManager.$('date').value = l.date || '';
+        UIManager.$('jours').value = l.jours ?? 1;
+        UIManager.$('prixJour').value = l.prixJour ?? 0;
+        UIManager.$('kms').value = l.kms ?? '';
+        UIManager.$('extras').value = l.extras ?? 0;
+        UIManager.$('fuelAdj').value = l.fuelAdj ?? 0;
+        UIManager.$('notes').value = l.notes || '';
+        UIManager.$('netOverride').value = (l.netOverride !== null && l.netOverride !== undefined) ? l.netOverride : '';
+        UIManager.$('vehicule').value = l.vehiculeId;
+        UIManager.$('cancelEditBtn').classList.remove('hidden');
+        UIManager.$('saveBtn').textContent = 'Mettre à jour';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      static duplicate(id) {
+        const l = this.locations.find(x => x.id === id);
+        if (!l) return;
+        const copy = {
+          ...l,
+          id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())) + Math.random().toString(36).slice(2, 6),
+          notes: (l.notes ? l.notes + " (dup)" : "(dup)")
+        };
+        this.locations.unshift(copy);
+        DataManager.saveAll();
+        this.renderTable();
+        SuiviManager.render();
+      }
+
+      static makeEditable(td, initialValue, type, onSave, step) {
+        const input = document.createElement('input');
+        input.type = type || 'text';
+        if (step) input.step = step;
+        input.value = initialValue ?? '';
+        input.style.width = '100%';
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { input.blur(); } });
+        input.addEventListener('blur', () => { onSave(input.value); });
+        td.innerHTML = '';
+        td.appendChild(input);
+        input.focus();
+        input.select?.();
+      }
+
+      static attachInlineEditors(tr, l) {
+        const map = [
+          { sel: '.cell-jours', field: 'jours', type: 'number' },
+          { sel: '.cell-prix', field: 'prixJour', type: 'number', step: '0.1' },
+          { sel: '.cell-kms', field: 'kms', type: 'number' },
+          { sel: '.cell-extras', field: 'extras', type: 'number', step: '0.1' },
+          { sel: '.cell-fuel', field: 'fuelAdj', type: 'number', step: '0.1' },
+          { sel: '.cell-notes', field: 'notes', type: 'text' }
+        ];
+        map.forEach(({ sel, field, type, step }) => {
+          const td = tr.querySelector(sel);
+          if (!td) return;
+          td.title = 'Double-clic pour éditer';
+          td.ondblclick = () => {
+            const startVal = (field === 'notes') ? (l.notes || '') : Number(l[field] || 0);
+            this.makeEditable(td, startVal, type, (val) => {
+              if (field === 'notes') { l.notes = String(val || ''); } else { l[field] = Number(val || 0); }
+              DataManager.saveAll();
+              this.renderTable();
+              SuiviManager.render();
+            }, step);
+          };
+        });
+        const tdNet = tr.querySelector('.cell-net');
+        if (tdNet) {
+          tdNet.title = 'Double-clic pour saisir un net reçu (override)';
+          tdNet.ondblclick = () => {
+            const startVal = (l.netOverride !== null && l.netOverride !== undefined) ? Number(l.netOverride) : Calculator.netLocation(l);
+            this.makeEditable(tdNet, startVal, 'number', (val) => {
+              const num = (val === null || val === '') ? null : Number(val);
+              l.netOverride = (val === null || val === '') ? null : (Number.isNaN(num) ? null : num);
+              DataManager.saveAll();
+              this.renderTable();
+              SuiviManager.render();
+            }, '0.1');
+          };
+        }
+      }
+
+      static fillVehSelect() {
+        const sel = UIManager.$('vehicule');
+        sel.innerHTML = '';
+        VehicleManager.vehicles.filter(v => v.active).forEach(v => {
+          const o = document.createElement('option');
+          o.value = v.id;
+          o.textContent = v.name;
+          sel.appendChild(o);
+        });
+      }
+
+      static renderTable() {
+        const tbody = UIManager.$('locTable');
+        tbody.innerHTML = '';
+        const m = UIManager.$('filterMonth').value;
+        const vf = UIManager.$('filterVehicule').value || 'ALL';
+        const q = (UIManager.$('filterNotes').value || '').toLowerCase();
+        const arr = this.locations.slice().sort((a, b) => new Date(b.date) - new Date(a.date)).filter(l =>
+          (!m || Calculator.monthKey(l.date) === m) &&
+          (vf === 'ALL' || l.vehiculeId === vf) &&
+          (!q || (l.notes || '').toLowerCase().includes(q))
+        );
+        for (const l of arr) {
+          const v = VehicleManager.getById(l.vehiculeId);
+          const net = Calculator.netLocation(l);
+          const overrideUsed = (l.netOverride !== null && l.netOverride !== undefined && !Number.isNaN(Number(l.netOverride)));
+          const tr = document.createElement('tr');
+          tr.dataset.id = l.id;
+          if (DataManager.ui.selectedId === l.id) tr.classList.add('row-selected');
+          let notesHtml = l.notes || '';
+          if (q && notesHtml.toLowerCase().includes(q)) {
+            notesHtml = notesHtml.replace(new RegExp(q, 'gi'), match => `<mark class="highlight">${match}</mark>`);
+          }
+          tr.innerHTML = `
+            <td class="cell-date">${l.date}</td>
+            <td class="cell-jours">${l.jours || 1}</td>
+            <td class="cell-prix">${(Number(l.prixJour) || 0).toFixed(2)}</td>
+            <td class="cell-kms">${l.kms || '-'}</td>
+            <td class="cell-extras">${(l.extras || 0).toFixed(2)}</td>
+            <td class="cell-fuel">${(l.fuelAdj || 0).toFixed(2)}</td>
+            <td class="cell-veh">${v ? v.name : '—'}</td>
+            <td class="cell-net">
+              <span class="pill" style="background:${net >= 0 ? 'rgba(22,163,74,.18)' : 'rgba(239,68,68,.18)'};color:${net >= 0 ? '#16a34a' : '#ef4444'}" title="${overrideUsed ? 'Valeur saisie manuellement (override)' : 'Calcul automatique'}">${net.toFixed(2)}€</span>
+              ${overrideUsed ? '<span class="ml-2 text-xs" style="padding:.1rem .4rem;border:1px solid var(--border);border-radius:.5rem;">Saisi</span>' : ''}
+            </td>
+            <td class="cell-notes" title="${(l.notes || '').replace(/"/g, '&quot;')}" style="max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${notesHtml}</td>
+            <td class="whitespace-nowrap">
+              <button class="btn-ghost" onclick="LocationManager.edit('${l.id}')">✏️</button>
+              <button class="btn-ghost" onclick="LocationManager.duplicate('${l.id}')">📄</button>
+              <button class="btn-ghost" onclick="LocationManager.remove('${l.id}')">🗑️</button>
+            </td>`;
+          tr.addEventListener('click', () => {
+            DataManager.ui.selectedId = l.id;
+            DataManager.saveAll();
+            this.renderTable();
+          });
+          tbody.appendChild(tr);
+          this.attachInlineEditors(tr, l);
+        }
+      }
+    }
+
+    class SuiviManager {
+      static firstActivityMonthForVeh(vehId) {
+        const locs = LocationManager.locations.filter(l => l.vehiculeId === vehId).sort((a, b) => a.date.localeCompare(b.date));
+        return locs[0] ? Calculator.monthKeyFromISO(locs[0].date) : new Date().toISOString().slice(0, 7);
+      }
+
+      static buildSuiviRows(months, before, fix, after, daysMap, vehF) {
+        const rows = [];
+        const active = VehicleManager.vehicles.filter(v => v.active);
+        months.forEach((m, i) => {
+          const beforeVal = before[i] || 0;
+          const fixesVal = fix[i] || 0;
+          const afterVal = after[i] || 0;
+          const margePct = (beforeVal > 0) ? (afterVal / beforeVal * 100) : 0;
+
+          const [yy, mm] = m.split('-').map(Number);
+          const daysInMonth = new Date(yy, mm, 0).getDate();
+          const rentedDays = daysMap[m] || 0;
+          const capacity = (vehF === 'ALL' ? daysInMonth * active.length : daysInMonth);
+          const occ = capacity > 0 ? (rentedDays / capacity) : 0;
+          const occStr = `${(occ * 100).toFixed(0)}% (${rentedDays}/${capacity} j)`;
+
+          let vnc = 0;
+          if (vehF === 'ALL') {
+            vnc = active.reduce((s, v) => s + VehicleManager.vncForVehicleAtMonth(v, m), 0);
+          } else {
+            const v = VehicleManager.getById(vehF);
+            vnc = v ? VehicleManager.vncForVehicleAtMonth(v, m) : 0;
+          }
+
+          rows.push({ m, beforeVal, fixesVal, afterVal, margePct, occStr, vnc });
+        });
+        return rows;
+      }
+
+      static renderSuiviTable(rows) {
+        const tb = UIManager.$('suiviTable');
+        tb.innerHTML = '';
+        rows.forEach(r => {
+          const occ = parseFloat(r.occStr.match(/(\d+)%/)?.[1] || 0);
+          const badgeClass = occ >= 50 ? 'occ-good' : occ >= 30 ? 'occ-warn' : 'occ-bad';
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${r.m}</td>
+            <td>${r.beforeVal.toFixed(2)}</td>
+            <td>${r.fixesVal.toFixed(2)}</td>
+            <td style="color:${r.afterVal >= 0 ? 'var(--pos)' : 'var(--neg)'}">${r.afterVal.toFixed(2)}</td>
+            <td>${r.margePct.toFixed(0)}%</td>
+            <td><span class="occ-badge ${badgeClass}">${r.occStr}</span></td>
+            <td>${r.vnc.toFixed(2)}</td>
+          `;
+          tb.appendChild(tr);
+        });
+      }
+
+      static render() {
+        const sel = UIManager.$('suiviVehicule');
+        sel.innerHTML = '';
+        const active = VehicleManager.vehicles.filter(v => v.active);
+        const optAll = document.createElement('option');
+        optAll.value = 'ALL';
+        optAll.textContent = 'Tous véhicules';
+        sel.appendChild(optAll);
+        active.forEach(v => {
+          const o = document.createElement('option');
+          o.value = v.id;
+          o.textContent = v.name;
+          sel.appendChild(o);
+        });
+        if (!sel.value || (!sel.dataset.setOnce && active[0])) {
+          sel.value = active[0]?.id || 'ALL';
+          sel.dataset.setOnce = '1';
+        }
+        const vehF = sel.value;
+        const mSel = UIManager.$('suiviMonth').value;
+        const filtered = LocationManager.locations.filter(l => (vehF === 'ALL' || l.vehiculeId === vehF));
+
+        const monthsNetMap = {};
+        const monthsDaysMap = {};
+        filtered.forEach(l => {
+          const piece = Calculator.splitLocationNetByMonth(l);
+          Object.entries(piece).forEach(([mk, val]) => {
+            if (!mSel || mk === mSel) { monthsNetMap[mk] = (monthsNetMap[mk] || 0) + val; }
+          });
+          const pieceDays = Calculator.splitLocationDaysByMonth(l);
+          Object.entries(pieceDays).forEach(([mk, val]) => {
+            if (!mSel || mk === mSel) { monthsDaysMap[mk] = (monthsDaysMap[mk] || 0) + val; }
+          });
+        });
+
+        const months = Object.keys(monthsNetMap).sort();
+        let monthlyBefore = [], monthlyFix = [], monthlyAfter = [];
+        if (vehF === 'ALL') {
+          monthlyBefore = months.map(m => monthsNetMap[m] || 0);
+          monthlyFix = months.map(() => active.reduce((s, v) => s + VehicleManager.fixedCostsMonthly(v), 0));
+        } else {
+          monthlyBefore = months.map(m => monthsNetMap[m] || 0);
+          const vSel = VehicleManager.getById(vehF);
+          monthlyFix = months.map(() => VehicleManager.fixedCostsMonthly(vSel));
+        }
+        monthlyAfter = monthlyBefore.map((v, i) => v - monthlyFix[i]);
+
+        // ROI Global
+        const totalNet = monthlyAfter.reduce((a, b) => a + b, 0);
+        const totalInvest = active.reduce((s, v) => s + (v.costs.totalInvested || 0), 0);
+        const roi = totalInvest > 0 ? (totalNet / totalInvest * 100) : 0;
+        UIManager.$('roiValue').textContent = `${roi.toFixed(1)}%`;
+        UIManager.$('roiValue').style.color = roi >= 10 ? 'var(--pos)' : roi >= 0 ? 'var(--warn)' : 'var(--neg)';
+
+        const currentM = mSel || months[months.length - 1];
+        const top = UIManager.$('monthTop'), bd = UIManager.$('monthBreakdown');
+        if (currentM) {
+          const before = monthsNetMap[currentM] || 0;
+          const fixSel = (vehF === 'ALL' ? active.reduce((s, v) => s + VehicleManager.fixedCostsMonthly(v), 0) : VehicleManager.fixedCostsMonthly(VehicleManager.getById(vehF)));
+          const after = before - fixSel;
+          const [yy, mm] = (currentM || '').split('-').map(Number);
+          const daysInMonth = new Date(yy, mm, 0).getDate();
+          const rentedDays = monthsDaysMap[currentM] || 0;
+          const capacity = (vehF === 'ALL' ? (daysInMonth * active.length) : daysInMonth);
+          const occ = capacity > 0 ? (rentedDays / capacity) : 0;
+          const occPct = (occ * 100).toFixed(0) + '%';
+          const occStyle = (occ >= 0.40) ? 'background:rgba(22,163,74,.18);color:#16a34a' : 'background:rgba(239,68,68,.18);color:#ef4444';
+          const occBadge = `<span class="ml-2 text-xs" style="padding:.1rem .45rem;border-radius:.5rem;border:1px solid var(--border);${occStyle}">Occupation ${occPct}</span>`;
+          top.innerHTML = `${currentM || '—'} · Net (avant fixes): <b>${Calculator.euro(before)}</b> · Fixes: <b>-${Calculator.euro(fixSel)}</b> · Résultat net: <b style="color:${after >= 0 ? 'var(--pos)' : 'var(--neg)'}">${Calculator.euro(after)}</b> ${occBadge} <span class="hint">(${rentedDays}/${capacity} j)</span>`;
+
+          bd.innerHTML = '';
+          if (vehF === 'ALL') {
+            active.forEach(v => {
+              const b = VehicleManager.fixedCostsBreakdown(v);
+              const card = document.createElement('div');
+              card.className = 'card';
+              card.innerHTML = `<div class="text-sm hint">${v.name} – Détail fixes</div><div class="grid-3 mt-2"><div><div class="text-xs hint">Assurance</div><div class="text-lg font-bold">${Calculator.euro(b.ass)}</div></div><div><div class="text-xs hint">Connect</div><div class="text-lg font-bold">${Calculator.euro(b.conn)}</div></div><div><div class="text-xs hint">Entretien</div><div class="text-lg font-bold">${Calculator.euro(b.ent)}</div></div><div><div class="text-xs hint">Amort. (Total - Résiduelle) ÷ ${b.months}</div><div class="text-lg font-bold">${Calculator.euro(b.amort)}</div></div></div>`;
+              bd.appendChild(card);
+            });
+            const total = active.reduce((s, v) => s + VehicleManager.fixedCostsMonthly(v), 0);
+            const cardTot = document.createElement('div');
+            cardTot.className = 'card';
+            cardTot.innerHTML = `<div class="text-sm hint">Total véhicules actifs – Fixes</div><div class="text-2xl font-extrabold">${Calculator.euro(total)}</div>`;
+            bd.appendChild(cardTot);
+          } else {
+            const v = VehicleManager.getById(vehF);
+            const b = VehicleManager.fixedCostsBreakdown(v);
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `<div class="text-sm hint">${v.name} – Détail fixes</div><div class="grid-3 mt-2"><div><div class="text-xs hint">Assurance</div><div class="text-lg font-bold">${Calculator.euro(b.ass)}</div></div><div><div class="text-xs hint">Connect</div><div class="text-lg font-bold">${Calculator.euro(b.conn)}</div></div><div><div class="text-xs hint">Entretien</div><div class="text-lg font-bold">${Calculator.euro(b.ent)}</div></div><div><div class="text-xs hint">Amort. (Total - Résiduelle) ÷ ${b.months}</div><div class="text-lg font-bold">${Calculator.euro(b.amort)}</div></div></div>`;
+            bd.appendChild(card);
+          }
+        } else {
+          top.textContent = 'Aucune donnée';
+          bd.innerHTML = '';
+        }
+
+        // Table + CSV
+        const rows = this.buildSuiviRows(months, monthlyBefore, monthlyFix, monthlyAfter, monthsDaysMap, vehF);
+        window.__lastSuiviRows = rows;
+        this.renderSuiviTable(rows);
+
+        // Charts
+        let chartNet = window.chartNet, chartCumul = window.chartCumul;
+        if (chartNet) chartNet.destroy();
+        if (chartCumul) chartCumul.destroy();
+        const percentMode = UIManager.$('modePercent')?.checked;
+        const barsData = percentMode
+          ? monthlyAfter.map((v, i) => (monthlyBefore[i] > 0 ? (v / monthlyBefore[i] * 100) : 0))
+          : monthlyAfter;
+        const barLabel = percentMode ? 'Marge (%)' : 'Net après frais fixes (€)';
+        const refFixDataset = !percentMode ? {
+          type: 'line',
+          label: 'Fixes (€)',
+          data: monthlyFix,
+          borderWidth: 1.5,
+          borderColor: 'rgba(148,163,184,.9)',
+          pointRadius: 2,
+          fill: false
+        } : null;
+        const datasets = [{
+          type: 'bar',
+          label: barLabel,
+          data: barsData,
+          backgroundColor: (ctx) => {
+            const val = ctx.raw;
+            const v = percentMode ? val : (monthlyAfter[ctx.dataIndex] || 0);
+            return v >= 0 ? 'rgba(79,70,229,.9)' : 'rgba(239,68,68,.9)';
+          }
+        }];
+        if (refFixDataset) datasets.push(refFixDataset);
+
+        window.chartNet = new Chart(UIManager.$('chartNet').getContext('2d'), {
+          type: 'bar',
+          data: { labels: months, datasets },
+          options: {
+            plugins: {
+              legend: { display: true },
+              tooltip: {
+                callbacks: {
+                  afterLabel: (ctx) => {
+                    const i = ctx.dataIndex;
+                    if (percentMode) {
+                      const a = monthlyAfter[i], b = monthlyBefore[i], f = monthlyFix[i];
+                      return [`Avant fixes: ${b.toFixed(2)}€`, `Fixes: ${f.toFixed(2)}€`, `Net après: ${a.toFixed(2)}€`];
+                    } else {
+                      const f = monthlyFix[i];
+                      return [`Fixes: ${f.toFixed(2)}€`];
+                    }
+                  }
+                }
+              }
+            },
+            scales: { y: { beginAtZero: true } }
+          }
+        });
+
+        const cum = []; let acc = 0;
+        for (const v of monthlyAfter) { acc += v; cum.push(acc); }
+        window.chartCumul = new Chart(UIManager.$('chartCumul').getContext('2d'), {
+          type: 'line',
+          data: { labels: months, datasets: [{ label: 'Cumul (€)', data: cum, fill: false, borderColor: 'rgba(79,70,229,.95)', tension: .25, pointRadius: 3 }] },
+          options: { plugins: { legend: { display: false } } }
+        });
+      }
+    }
+
+    class Calculator {
+      static euro(n) { return `${(n || 0).toFixed(2)}€`; }
+
+      static monthKey(d) { return d?.slice(0, 7); }
+
+      static parseDateISO(dateStr) {
+        const [y, m, d] = dateStr.split('-').map(Number);
+        return new Date(Date.UTC(y, m - 1, d));
+      }
+
+      static addDaysUTC(dateObj, n) {
+        const d = new Date(dateObj.getTime());
+        d.setUTCDate(d.getUTCDate() + n);
+        return d;
+      }
+
+      static monthKeyFromDate(dateObj) {
+        const y = dateObj.getUTCFullYear();
+        const m = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+        return `${y}-${m}`;
+      }
+
+      static splitLocationNetByMonth(l) {
+        const days = Math.max(1, Number(l.jours || 1));
+        const start = this.parseDateISO(l.date);
+        const totalNet = this.netLocation(l);
+        const perDay = totalNet / days;
+        const map = {};
+        for (let i = 0; i < days; i++) {
+          const d = this.addDaysUTC(start, i);
+          const mk = this.monthKeyFromDate(d);
+          map[mk] = (map[mk] || 0) + perDay;
+        }
+        return map;
+      }
+
+      static splitLocationDaysByMonth(l) {
+        const days = Math.max(1, Number(l.jours || 1));
+        const start = this.parseDateISO(l.date);
+        const map = {};
+        for (let i = 0; i < days; i++) {
+          const d = this.addDaysUTC(start, i);
+          const mk = this.monthKeyFromDate(d);
+          map[mk] = (map[mk] || 0) + 1;
+        }
+        return map;
+      }
+
+      static monthDiffInclusive(startYYYYMM, endYYYYMM) {
+        if (!startYYYYMM || !endYYYYMM) return 0;
+        const [sy, sm] = startYYYYMM.split('-').map(Number);
+        const [ey, em] = endYYYYMM.split('-').map(Number);
+        return (ey - sy) * 12 + (em - sm) + 1;
+      }
+
+      static monthKeyFromISO(iso) { return iso?.slice(0, 7); }
+
+      static netLocation(l) {
+        if (l.netOverride !== null && l.netOverride !== undefined && !Number.isNaN(Number(l.netOverride))) {
+          return Number(l.netOverride);
+        }
+        const com = (GlobalManager.globals.commission || 0) / 100;
+        const after = (l.prixJour * (l.jours || 1)) * (1 - com);
+        const v = VehicleManager.getById(l.vehiculeId);
+        const wearRate = (GlobalManager.globals.wearPerKm || 0);
+        const wear = (v?.costs?.useWear ? ((l.kms || 0) * wearRate) : 0);
+        return after - wear - (l.extras || 0) + (l.fuelAdj || 0);
+      }
+    }
+
+    // Event Listeners
+    UIManager.$('themeToggle').addEventListener('change', () => {
+      DataManager.theme = UIManager.$('themeToggle').checked ? 'light' : 'dark';
+      UIManager.applyTheme();
+    });
+    UIManager.$('exportJson').addEventListener('click', UIManager.exportJson);
+    UIManager.$('exportCsv').addEventListener('click', UIManager.exportCsv);
+    UIManager.$('exportPdf').addEventListener('click', UIManager.exportPdf);
+    UIManager.$('importJson').addEventListener('change', e => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = () => DataManager.importData(JSON.parse(r.result));
+      r.readAsText(f);
+    });
+    UIManager.$('exportSuiviCsv').addEventListener('click', () => {
+      if (window.__lastSuiviRows) {
+        const header = ['Mois', 'Net avant fixes (€)', 'Fixes (€)', 'Net après (€)', 'Marge (%)', 'Occupation', 'VNC (€)'];
+        const lines = [header.join(';')].concat(
+          window.__lastSuiviRows.map(r => [r.m, r.beforeVal.toFixed(2), r.fixesVal.toFixed(2), r.afterVal.toFixed(2), r.margePct.toFixed(0), r.occStr, r.vnc.toFixed(2)].join(';'))
+        );
+        const blob = new Blob([lines.join('\n')], {type: 'text/csv;charset=utf-8;'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `suivi-${new Date().toISOString().slice(0,10)}.csv`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 0);
+        DataManager.showToast('Export CSV OK !', 'success');
+      }
+    });
+    UIManager.$('filterMonth').addEventListener('change', () => LocationManager.renderTable());
+    UIManager.$('filterVehicule').addEventListener('change', () => LocationManager.renderTable());
+    UIManager.$('filterNotes').addEventListener('input', () => LocationManager.renderTable());
+    const compactToggle = UIManager.$('compactToggle');
+    compactToggle.checked = !!DataManager.ui.compact;
+    compactToggle.addEventListener('change', () => {
+      DataManager.ui.compact = compactToggle.checked;
+      DataManager.saveAll();
+      document.body.classList.toggle('compact', DataManager.ui.compact);
+    });
+    UIManager.$('suiviVehicule')?.addEventListener('change', SuiviManager.render);
+    UIManager.$('suiviMonth')?.addEventListener('change', SuiviManager.render);
+    UIManager.$('modePercent')?.addEventListener('change', SuiviManager.render);
+
+    // Raccourcis clavier
+    function isTypingInInput() {
+      const a = document.activeElement;
+      return a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA');
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        LocationManager.save();
+        return;
+      }
+      if (isTypingInInput()) return;
+      if (e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        UIManager.showTab('locations');
+        UIManager.$('date').focus();
+        return;
+      }
+      if (e.key.toLowerCase() === 'd' && DataManager.ui.selectedId) {
+        e.preventDefault();
+        LocationManager.duplicate(DataManager.ui.selectedId);
+        return;
+      }
+      if (e.key.toLowerCase() === 'e' && DataManager.ui.selectedId) {
+        e.preventDefault();
+        LocationManager.edit(DataManager.ui.selectedId);
+        return;
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && DataManager.ui.selectedId) {
+        e.preventDefault();
+        LocationManager.remove(DataManager.ui.selectedId);
+        return;
+      }
+    });
+
+    // Init
+    DataManager.autoBackup();
+    if (!VehicleManager.vehicles.find(v => v.id === 'clio')) {
+      VehicleManager.vehicles.push({
+        id: 'clio',
+        name: 'Clio',
+        active: true,
+        costs: { ass: 56, conn: 25, ent: 45, totalInvested: 11659, residual: 0, amortMonths: 60, useWear: false, acqStart: '' }
+      });
+    }
+    if (!VehicleManager.vehicles.find(v => v.id === 'tesla')) {
+      VehicleManager.vehicles.push({
+        id: 'tesla',
+        name: 'Tesla',
+        active: true,
+        costs: { ass: 115, conn: 0, ent: 30, totalInvested: 0, residual: 0, amortMonths: 60, useWear: false, acqStart: '' }
+      });
+    }
+    UIManager.applyTheme();
+    VehicleManager.render();
+    LocationManager.fillVehSelect();
+    UIManager.fillFilters();
+    LocationManager.renderTable();
+    UIManager.showTab('suivi');
+  </script>
+</body>
+</html>
